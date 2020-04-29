@@ -172,13 +172,16 @@ void handle_byte(void);
 void handle_org(void);
 void handle_word(void);
 void not_imp(void);
+void handle_if(void);
+void handle_endif(void);
+void handle_else(void);
 
 struct pseudo_func functions[] = {
    { ".BYTE", &handle_byte },
-   { ".ELSE", &not_imp },
-   { ".ENDIF", &not_imp },
+   { ".ELSE", &handle_else },
+   { ".ENDIF", &handle_endif },
    { ".ENDMAC", &not_imp },
-   { ".IF", &not_imp },
+   { ".IF", &handle_if },
    { ".IFDEF", &not_imp },
    { ".IFNDEF", &not_imp },
    { ".INCBIN", &not_imp },

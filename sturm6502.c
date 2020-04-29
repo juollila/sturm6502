@@ -24,7 +24,7 @@ struct file file_lst;
 
 char line[MAX_LINE_LEN];
 char cline[MAX_LINE_LEN]; /* line with preversed case */
-unsigned char column, pass, opt_debug, opt_list, opt_symbol;
+unsigned char column, pass, opt_debug, opt_list, opt_symbol, if_supress, if_seen;
 unsigned int PC;
 struct symbol *symbols, *last_symbol;
 struct token *tokens, *last_token, *tok_global;
@@ -44,6 +44,7 @@ void error(unsigned char err) {
 }
 
 void init(void) {
+   unit_asm_fails = 0;
    column = 0;
    PC = 0;
    pass = 0;
@@ -54,6 +55,8 @@ void init(void) {
    opt_debug = 0;
    opt_list = 0;
    opt_symbol = 0;
+   if_supress = 0;
+   if_seen = 0;
    file_asm.mode = strdup("r");
    file_lst.mode = strdup("r");
    file_out.mode = strdup("w");
@@ -570,7 +573,7 @@ void parse_line(void) {
       return;
    }
    /* identifier i.e. equ or label */
-   if (tok->id == TOKEN_IDENT) {
+   if (tok->id == TOKEN_IDENT && if_supress == 0) {
       tok_prev = tok;
       tok = get_token();
       if (tok->id == TOKEN_EQU) {
@@ -593,8 +596,12 @@ void parse_line(void) {
       return;
       // HACK!!! Does not work with all pseudo codes
       // tok = tok_global;
+   }
+   /* check .if supressing is ongoing */
+   if (if_supress == 1)
+      return;
    /* mnemonic */
-   } else if (tok->id == TOKEN_CMD) {
+   if (tok->id == TOKEN_CMD) {
       inst = instructions[tok->value];
       tok = get_token();
       if (tok->id == TOKEN_EOL ||
@@ -759,13 +766,46 @@ void handle_byte(void) {
    } while (tok->id == TOKEN_COMMA);
 }
 
+void handle_if(void) {
+   int value;
+   value = eval();
+   if (value == 0) {
+      if_supress = 1;
+      if_seen = 1;
+   } else {
+      if_supress = 0;
+      if_seen = 1;
+   }
+}
+
+void handle_else(void) {
+   if (if_seen == 1) {
+      if (if_supress == 0)
+         if_supress = 1;
+      else if_supress = 0;
+   } else error(SYNTAX_ERROR);
+}
+
+void handle_endif(void) {
+   if (if_seen == 1) {
+      if_supress = 0;
+      if_seen = 0;
+   } else error(SYNTAX_ERROR);
+}
+
 void handle_org(void) {
+   if (if_supress==1)
+      return;
+
    PC = eval();
    emit0();
 }
 
 void handle_word(void) {
    int value;
+   if (if_supress == 1)
+      return;
+
    do {
       value = eval();
       emit2(value%256, value/256); 

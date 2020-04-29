@@ -63,10 +63,12 @@ setnam	=	$ffbd
 
 ; macros
 
-;	MAC	lbeq
-;	dc.b	$d0,$3	; bne +3
-;	jmp	{1}
-;	ENDM
+.if 0
+	MAC	lbeq
+	dc.b	$d0,$3	; bne +3
+	jmp	{1}
+	ENDM
+.endif
 
 	.org	$c000-2
 	.word	$c000

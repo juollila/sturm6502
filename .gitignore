@@ -1,0 +1,9 @@
+*.DS_Store
+*.swp
+*.o
+a.out
+sturm6502
+test/smoke/smoke.hex
+test/smoke/sturmdos.bin
+test/unit/lcut/
+test/unit/test_asm
