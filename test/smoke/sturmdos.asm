@@ -80,9 +80,19 @@ setnam	=	$ffbd
 ;
 ; after our own routine we will jump
 ; to gone+3
+.ifdef 	igone			; this dummy ifdef is to test compiler
 	lda	igone
+.endif
+.ifndef foobar			; this dummy ifndef is to test compiler
 	sta	goneptr
+.endif
+.ifdef  foobar			; this dummy ifdef is to test compiler
+				; lda #0 is not compiled
+	lda	#0
+.endif
+.ifndef foobar			; this dummy ifndef is to test compiler
 	sta	saveptr
+.endif
 	lda	igone+1
 	sta	goneptr+1
 	sta	saveptr+1

@@ -173,6 +173,8 @@ void handle_org(void);
 void handle_word(void);
 void not_imp(void);
 void handle_if(void);
+void handle_ifdef(void);
+void handle_ifndef(void);
 void handle_endif(void);
 void handle_else(void);
 
@@ -182,8 +184,8 @@ struct pseudo_func functions[] = {
    { ".ENDIF", &handle_endif },
    { ".ENDMAC", &not_imp },
    { ".IF", &handle_if },
-   { ".IFDEF", &not_imp },
-   { ".IFNDEF", &not_imp },
+   { ".IFDEF", &handle_ifdef },
+   { ".IFNDEF", &handle_ifndef },
    { ".INCBIN", &not_imp },
    { ".INCLUDE", &not_imp },
    { ".MAC", &not_imp },

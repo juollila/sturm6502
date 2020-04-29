@@ -769,14 +769,45 @@ void handle_byte(void) {
 void handle_if(void) {
    int value;
    value = eval();
-   if (value == 0) {
+   if_seen = 1;
+   if (value == 0)
       if_supress = 1;
-      if_seen = 1;
-   } else {
+   else
       if_supress = 0;
-      if_seen = 1;
-   }
 }
+
+void handle_ifdef(void) {
+   char *label;
+   struct symbol *sym = symbols;
+   skip_delimiter();
+   label = get_identifier();
+   if_seen = 1;
+   while (sym) {
+      if (strcmp(sym->name, label)==0) {
+         if_supress = 0;
+	 return;
+      }
+      sym = sym->global;
+   }
+   if_supress = 1;
+}
+
+void handle_ifndef(void) {
+   char *label;
+   struct symbol *sym = symbols;
+   skip_delimiter();
+   label = get_identifier();
+   if_seen = 1;
+   while (sym) {
+      if (strcmp(sym->name, label)==0) {
+         if_supress = 1;
+	 return;
+      }
+      sym = sym->global;
+   }
+   if_supress = 0;
+}
+
 
 void handle_else(void) {
    if (if_seen == 1) {
