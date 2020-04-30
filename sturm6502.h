@@ -18,7 +18,6 @@
 
 /* misc defines */
 #define MAX_LINE_LEN 128
-#define MAX_TOKENS 64
 #define EOL 0x0d
 #define NOT_FOUND -1
 
@@ -176,6 +175,7 @@ void handle_if(void);
 void handle_ifdef(void);
 void handle_ifndef(void);
 void handle_incbin(void);
+void handle_include(void);
 void handle_endif(void);
 void handle_else(void);
 
@@ -188,7 +188,7 @@ struct pseudo_func functions[] = {
    { ".IFDEF", &handle_ifdef },
    { ".IFNDEF", &handle_ifndef },
    { ".INCBIN", &handle_incbin },
-   { ".INCLUDE", &not_imp },
+   { ".INCLUDE", &handle_include },
    { ".MAC", &not_imp },
    { ".ORG", &handle_org },
    { ".WORD", &handle_word }

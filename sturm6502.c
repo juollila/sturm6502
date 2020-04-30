@@ -868,6 +868,32 @@ void handle_incbin(void) {
    } else error(SYNTAX_ERROR);
 }
 
+void handle_include(void) {
+   struct token *tok;
+   struct file file_inc;
+   struct file *file_parent;
+
+   if (if_supress == 1)
+      return;
+   tok = get_token();
+   if (tok->id == TOKEN_STRING) {
+      file_parent = file_cur;
+      file_cur = &file_inc;
+      file_cur->name = tok->label;
+      file_cur->mode = "r";
+      open_file(file_cur);
+      while(read_line(file_cur) != 0) {
+         strcpy(&cline[0], &line[0]);
+         strupper(&line[0]);
+         column = 0;
+         parse_line();
+         free_tokens();
+      }
+      close_file(file_cur);
+      file_cur = file_parent;
+   } else error(SYNTAX_ERROR);
+}
+
 void handle_else(void) {
    if (if_seen == 1) {
       if (if_supress == 0)
@@ -965,12 +991,12 @@ int main(int argc, char *argv[]) {
    char *str;
    init();
    parse_params(argc, argv);
-   open_file(&file_asm);
+   file_cur = &file_asm;
+   open_file(file_cur);
    open_file(&file_out);
    pass = 1;
-   file_cur = &file_asm;
    printf("*** Pass #1 ***\n");
-   while((str = read_line(&file_asm)) != 0) {
+   while((str = read_line(file_cur)) != 0) {
       strcpy(&cline[0], &line[0]);
       strupper(&line[0]);
       column = 0;
@@ -980,20 +1006,20 @@ int main(int argc, char *argv[]) {
    PC = 0;
    pass = 2;
    printf("*** Pass #2 ***\n");
-   close_file(&file_asm);
-   open_file(&file_asm);
+   close_file(file_cur);
+   open_file(file_cur);
    if (pass == 2 && opt_debug >= 2) {
       printf("*** Listing ***\n");
       printf("Line# Loc  Code     Line\n");
    }
-   while((str = read_line(&file_asm)) != 0) {
+   while((str = read_line(file_cur)) != 0) {
       strcpy(&cline[0], &line[0]);
       strupper(&line[0]);
       column = 0;
       parse_line();
       free_tokens();
    }
-   close_file(&file_asm);
+   close_file(file_cur);
    close_file(&file_out);
    if (opt_symbol) {
       sort_symbols();
