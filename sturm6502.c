@@ -208,6 +208,52 @@ void print_symbols(void) {
    }
 }
 
+struct symbol *get_symbol(unsigned int j) {
+   struct symbol *sym = symbols;
+   unsigned int i = 0;
+   while(i < j && sym) {
+      i++;
+      sym = sym->global;
+   }
+   return sym;
+}
+
+void swap_symbols(struct symbol *sym1, struct symbol *sym2) {
+   struct symbol tmp;
+   tmp.value = sym1->value;
+   tmp.name = sym1->name;
+   tmp.local = sym1->local;
+   sym1->value = sym2->value;
+   sym1->name = sym2->name;
+   sym1->local = sym2->local;
+   sym2->value = tmp.value;
+   sym2->name = tmp.name;
+   sym2->local = tmp.local;
+};
+
+/* simple (slow) insertion sort */
+void sort_symbols(void) {
+   unsigned int i = 1;
+   unsigned int j;
+   unsigned int len = 0;
+   struct symbol *sym = symbols;
+   /* calculate len */
+   while (sym) {
+      len++;
+      sym = sym->global;
+   }
+   /* actual insertion sort */
+   while (i < len) {
+      j = i;
+      while (j > 0 && (get_symbol(j-1)->value) > (get_symbol(j)->value)) {
+         swap_symbols(get_symbol(j), get_symbol(j-1));
+	 j--;
+      }
+      i++;
+   }
+}
+
+
 struct token *make_token(unsigned int id, int value, char *label) {
    struct token *new_tok = malloc(sizeof(struct token));
    if (new_tok) {
@@ -940,8 +986,10 @@ int main(int argc, char *argv[]) {
    }
    close_file(&file_asm);
    close_file(&file_out);
-   if (opt_symbol)
+   if (opt_symbol) {
+      sort_symbols();
       print_symbols();
+   }
    free_symbols();
    return 0;
 }
