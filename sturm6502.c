@@ -17,10 +17,11 @@
 
 int eval();
 
-struct file file_asm;
 struct file *file_cur; /* current file */
+struct file file_asm;
 struct file file_out;
 struct file file_lst;
+struct file file_bin; /* incbin file */
 
 char line[MAX_LINE_LEN];
 char cline[MAX_LINE_LEN]; /* line with preversed case */
@@ -59,6 +60,7 @@ void init(void) {
    if_seen = 0;
    file_asm.mode = strdup("r");
    file_lst.mode = strdup("r");
+   file_bin.mode = strdup("r");
    file_out.mode = strdup("w");
    file_out.name = strdup("a.out");
 }
@@ -122,14 +124,11 @@ int get_command(void) {
    unsigned char i;
    while (isalpha(line[column]))
       column++;
-   // line[column]=0;
    for (i = 0; i < (sizeof(instructions) / sizeof(struct instruction)); i++) {
       if (strncmp(&line[start], instructions[i].mnemonic, 3) == 0 && !isalnum(line[start+3])) {
-	 // printf("%s\n", instructions[i].mnemonic);
          return i;
-      } // else printf("%s\n", instructions[i].mnemonic);
+      }
    }
-   // printf("Not found: %s\n", &line[start]);
    column = start;
    return NOT_FOUND;
 }
@@ -194,7 +193,6 @@ void free_symbols(void) {
 void print_symbols(void) {
    struct symbol *symbol1, *symbol2;
    symbol1 = symbols;
-   // struct symbol *symbol2 = NULL;
    printf("*** Symbols ***\n");
    while (symbol1) {
       symbol2 = symbol1->global;
@@ -623,7 +621,6 @@ void parse_line(void) {
       tok_prev = tok;
       tok = get_token();
       if (tok->id == TOKEN_EQU) {
-	 // printf("equ\n");
          value = eval();
 	 make_symbol(tok_prev->label, value);
 	 tok = tok_global;
@@ -854,6 +851,22 @@ void handle_ifndef(void) {
    if_supress = 0;
 }
 
+void handle_incbin(void) {
+   struct token *tok;
+   int input;
+   if (if_supress == 1)
+      return;
+   tok = get_token();
+   if (tok->id == TOKEN_STRING) {
+      file_bin.name = tok->label;
+      open_file(&file_bin);
+      while((input = fgetc(file_bin.file)) != EOF)
+         emit1(input);
+      close_file(&file_bin);
+      if (ferror(file_bin.file))
+         error(READ_ERROR);
+   } else error(SYNTAX_ERROR);
+}
 
 void handle_else(void) {
    if (if_seen == 1) {
@@ -871,7 +884,7 @@ void handle_endif(void) {
 }
 
 void handle_org(void) {
-   if (if_supress==1)
+   if (if_supress == 1)
       return;
 
    PC = eval();
@@ -910,8 +923,6 @@ void parse_params(int argc, char *argv[]) {
       exit(1);
    }
    file_asm.name = argv[argc-1]; // 2
-   // printf("%d\n", argc);
-   // printf("%s\n", file_asm.name);
    while (i < argc - 1) { // i = 1
       if (strncmp("-d", argv[i], 2) == 0 && (i < argc - 2)) {
          opt_debug = argv[i+1][0] - '0';
@@ -921,12 +932,10 @@ void parse_params(int argc, char *argv[]) {
 	 parse_line();
 	 i += 2;
       } else if (strncmp("-l", argv[i], 2) == 0 && i < (argc -2 )) {
-      printf("l");
          opt_list = 1;
 	 file_lst.name = argv[i+1];
 	 i += 2;
       } else if (strncmp("-o", argv[i], 2) == 0 && i < (argc -2 )) {
-      printf("o");
 	 file_out.name = argv[i+1];
 	 i += 2;
       } else if (strncmp("-s", argv[i], 2) == 0) {
