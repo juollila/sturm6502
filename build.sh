@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 cc sturm6502.c -o sturm6502
 ./sturm6502 -d 1 -l test/smoke/sturmdos.lst -o test/smoke/sturmdos.bin test/smoke/sturmdos.asm

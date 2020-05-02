@@ -7,4 +7,5 @@ test/smoke/smoke.hex
 test/smoke/sturmdos.bin
 test/unit/lcut/
 test/unit/test_asm
+test/unit/test_pseudo
 test/smoke/sturmdos.lst

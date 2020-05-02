@@ -53,7 +53,7 @@ void init(void) {
    unit_asm_fails = 0;
    column = 0;
    PC = 0;
-   pass = 0;
+   pass = 1;
    symbols = NULL;
    last_symbol = NULL;
    tokens = NULL;
