@@ -47,6 +47,7 @@ enum {
    TOKEN_PSEUDO,
    TOKEN_CHAR,
    TOKEN_PARAM,
+   TOKEN_LOCAL,
    TOKEN_UNKNOWN
 };
 /* error messages */

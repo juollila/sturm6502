@@ -87,24 +87,12 @@ checkCommand
 	php
 	cmp	#"@"
 	lbeq	atcommand
-;        bne	skip
-;        jmp	atcommand
-;skip
 	cmp	#$ad	; / basic token
-	; lbeq	loadBasic
-        bne	skip2
-        jmp	loadBasic
-skip2
+	 lbeq	loadBasic
 	cmp	#"%"
-	; lbeq	loadML
-        bne	skip3
-	jmp	loadML
-skip3
+	lbeq	loadML
 	cmp	#$5f	; left arrow
-	; lbeq	runBasic
-        bne	skip4
-	jmp	runBasic
-skip4
+	lbeq	runBasic
 	plp
 	jmp	(goneptr)
 
@@ -113,23 +101,14 @@ atcommand
 	plp
 	jsr	parseString
 	lda	length
-	; lbeq	readError
-        bne	skip5
-	jmp	readError
-skip5
+	lbeq	readError
 	lda	param
-	cmp	#$51	; q
+	cmp	#"q"
 	beq	quit
-	cmp	#$24	; $
-	; lbeq	readDir
-	bne	skip6
-	jmp	readDir
-skip6
-	cmp	#$23	; #
-	; lbeq	changeDrive
-	bne	skip7
-	jmp	changeDrive
-skip7
+	cmp	#"$"
+	lbeq	readDir
+	cmp	#"#"
+	lbeq	changeDrive
 	; jump to send command routine if it is not @, @$, or @# command
 	jmp	sendCommand
 
@@ -138,26 +117,26 @@ skip7
 ; routine supresses leading space and " characters
 ; routine supresses trailing " character
 parseString
-	jsr	nextChar	; supress spaces
-	cmp	#$20
+	jsr	@nextChar	; supress spaces
+	cmp	#" "
 	beq	parseString
 	ldx	#0
-	cmp	#$22	; "
-	bne	parseString3
-parseString2
-	jsr	nextChar	; supress "
-parseString3
-	cmp	#$22
-	beq	parseExit1
+	cmp	#'"'
+	bne	@parseString3
+@parseString2
+	jsr	@nextChar	; supress "
+@parseString3
+	cmp	#'"'
+	beq	@parseExit1
 	cmp	#0
-	beq	parseExit2
+	beq	@parseExit2
 	sta	param,x
 	inx
 	sec
-	bcs	parseString2
-parseExit1
-	jsr	nextChar	; supress "
-parseExit2
+	bcs	@parseString2
+@parseExit1
+	jsr	@nextChar	; supress "
+@parseExit2
 	stx	length
 ;debug
 ;	ldx	#0
@@ -175,12 +154,12 @@ parseExit2
 	rts
 
 ; get next character in parameter string
-nextChar
+@nextChar
 	ldy	#0
 	inc	textptr
-	bne	nextChar2
+	bne	@nextChar2
 	inc	textptr+2
-nextChar2
+@nextChar2
 	lda	(textptr),y
 	rts
 ; remove dos commands from basic interpreter
@@ -248,12 +227,12 @@ loadFile
 	lda	run
 	beq	loadFile2
 	ldx	#0
-copyRunCmd
+@copyRunCmd
 	lda	runtext,x
 	sta	keybuffer,x
 	inx
 	cmp	#13
-	bne	copyRunCmd
+	bne	@copyRunCmd
 	stx	ndx
 loadFile2
 	jmp	(warm)	; basic warm start
@@ -314,18 +293,18 @@ readError
 	ldx	#15	; logical file
 	jsr	chkin
 
-prtErr	jsr	chrin
+@prtErr	jsr	chrin
 	cmp	#13
-	beq	readError2
+	beq	@preadError2
 	jsr	chrout
-	jmp	prtErr
-readError2
+	jmp	@prtErr
+@preadError2
 	jsr	chrout
 	;lda	#5
 	lda	#15
 	jsr	close
 	jsr	clrchn	
-readErrorExit
+@preadErrorExit
 	lda	#0
 	jmp	(goneptr)
 
@@ -338,12 +317,12 @@ changeDrive
 	sta	device
 	lda	length
 	cmp	#2
-	beq	changeDrive1
+	beq	@changeDrive1
 	lda	param+2
 	cmp	#"0"
-	bcc	changeDrive1
+	bcc	@changeDrive1
 	cmp	#":"
-	bcs	changeDrive1
+	bcs	@changeDrive1
 	sec
 	sbc	#"0"
 	pha
@@ -358,7 +337,7 @@ changeDrive
 	clc
 	adc	device
 	sta	device
-changeDrive1
+@changeDrive1
 	lda	#0
 	jmp	(goneptr)
 	
@@ -368,17 +347,17 @@ changeDrive1
 ; y=address (high byte)
 ; changes a, x and flags
 printString
-	stx	printString2+1
-	sty	printString2+2
+	stx	@printString2+1
+	sty	@printString2+2
 	ldx	#0
-printString2
+@printString2
 	lda	readytext,x
-	beq	printExit
+	beq	@printExit
 	jsr	chrout
 	inx
 	sec
-	bcs	printString2
-printExit
+	bcs	@printString2
+@printExit
 	rts
 
 readDir
@@ -393,7 +372,7 @@ readDir
 	jsr	setnam
 
 	jsr	open
-	bcs	readDirError
+	bcs	@preadDirError
 	;jsr	readst
 	;and	#$ff
 	;bne	readDirError
@@ -404,13 +383,13 @@ readDir
 	jsr	chrin	; skip start address
 	jsr	chrin
 
-readDir1
+@preadDir1
 	jsr	chrin	; skip 16-bit link to next basic line
 	jsr	chrin
 
 	jsr	readst
 	and	#$ff
-	bne	readDirExit ; brach to exit if there was an error
+	bne	@preadDirExit ; brach to exit if there was an error
 
 	jsr	chrin	; read basic line number
 	sta	bin
@@ -423,25 +402,25 @@ readDir1
 	jsr	printLineNum
 
 ; print characters until end of line is reached
-readDir2
+@preadDir2
 	jsr	chrin
 	cmp	#0
-	beq	readDirEOL
+	beq	@preadDirEOL
 	jsr	chrout
-	jmp	readDir2
+	jmp	@preadDir2
 
 ; print return at the end of line
-readDirEOL
+@preadDirEOL
 	lda	#13
 	jsr	chrout
-	jmp	readDir1
+	jmp	@preadDir1
 
-readDirExit
+@preadDirExit
 	lda	#1
 	jsr	close
 	jsr	clrchn
 
-readDirError
+@preadDirError
 	lda	#1	; open failed, but file must be still closed
 	jsr	close
 	lda	#0
@@ -455,23 +434,23 @@ readDirError
 printLineNum
 	lda	bcd+2
 	and	#$0f
-	bne	lineNum1
+	bne	@lineNum1
 	lda	bcd+1
 	and	#$f0
-	bne	lineNum2
+	bne	@lineNum2
 	lda	bcd+1
 	and	#$0f
-	bne	lineNum3
+	bne	@lineNum3
 	lda	bcd+0
 	and	#$f0
-	bne	lineNum4
-	jmp	lineNum5
+	bne	@lineNum4
+	jmp	@lineNum5
 ; print x0000
-lineNum1
+@lineNum1
 	ora	#48	; convert to petscii
 	jsr	chrout
 ; print x000
-lineNum2
+@lineNum2
 	ror
 	ror
 	ror
@@ -480,11 +459,11 @@ lineNum2
 	ora	#48
 	jsr	chrout
 ; print x00
-lineNum3
+@lineNum3
 	ora	#48
 	jsr	chrout
 ; print x0
-lineNum4
+@lineNum4
 	ror
 	ror
 	ror
@@ -493,7 +472,7 @@ lineNum4
 	ora	#48
 	jsr	chrout
 ; print x
-lineNum5
+@lineNum5
 	lda	bcd+0
 	and	#$0f
 	ora	#48
@@ -513,7 +492,7 @@ binBCD16
 	sta bcd+2
 	ldx #16		; The number of source bits
 
-convertBit
+@convertBit
 	asl bin+0	; Shift out one bit
 	rol bin+1
 	lda bcd+0	; And add into result
@@ -526,15 +505,11 @@ convertBit
 	adc bcd+2
 	sta bcd+2
 	dex		; And repeat for next bit
-	bne convertBit
+	bne @convertBit
 	cld		; Back to binary
 
 	rts		; All Done.
 
-; title	dc.b	"STURMDOS V1.0 INSTALLED",13,0
-; runtext	dc.b	"RUN",13,0	; run command
-; readytext dc.b	13,"READY.",13,0
-; dirname	dc.b	"$"
 title	.byte	"STURMDOS V1.0 INSTALLED",13,0
 runtext	.byte	"RUN",13,0	; run command
 readytext .byte	13,"READY.",13,0

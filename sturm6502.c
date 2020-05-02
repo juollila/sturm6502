@@ -31,7 +31,7 @@ unsigned char column, pass;
 unsigned char opt_debug, opt_list, opt_symbol;
 unsigned char if_supress, if_seen;
 unsigned int PC;
-struct symbol *symbols, *last_symbol;
+struct symbol *symbols, *last_symbol, *last_label;
 struct token *tokens, *last_token, *tok_global;
 struct macro *macros, *last_macro;
 
@@ -60,6 +60,7 @@ void init(void) {
    last_token = NULL;
    macros = NULL;
    last_macro = NULL;
+   last_label = NULL;
    opt_debug = 0;
    opt_list = 0;
    opt_symbol = 0;
@@ -165,6 +166,20 @@ struct symbol *find_symbol(char *name) {
    return NULL;
 }
 
+struct symbol *find_local_symbol(char *name) {
+   struct symbol *next_symbol;
+   if (last_label)
+     next_symbol = last_label->local;
+   else
+      return NULL;
+   while (next_symbol) {
+      if (strcmp(name, next_symbol->name) == 0)
+         return next_symbol;
+      next_symbol = next_symbol->local;
+   }
+   return NULL;
+}
+
 void make_symbol(char *name, unsigned int value) {
    struct symbol *old_symbol, *new_symbol;
    char *symbol_name;
@@ -186,10 +201,45 @@ void make_symbol(char *name, unsigned int value) {
    }
 }
 
+void make_local_symbol(char *name, unsigned int value) {
+   struct symbol *old_symbol, *new_symbol, *last_local;
+   char *symbol_name;
+   /* if symbol already exists then update it */
+   if((old_symbol=find_local_symbol(name))!=0) {
+      old_symbol->value = value;
+      return;
+   }
+   /* new symbol */
+   new_symbol = malloc(sizeof(struct symbol));
+   symbol_name = strdup(name);
+   if (last_label)
+     last_local = last_label;
+   else
+      error(SYNTAX_ERROR);
+   if (new_symbol && symbol_name) {
+      while(last_local->local)
+         last_local = last_local->local;
+      last_local->local = new_symbol;
+      new_symbol->global = NULL;
+      new_symbol->local = NULL;
+      new_symbol->name = symbol_name;
+      new_symbol->value = value;
+   }
+}
+
 void free_symbols(void) {
    struct symbol *next_symbol = symbols;
-   struct symbol *current_symbol;
+   struct symbol *current_symbol, *local_symbol;
    while (next_symbol) {
+      /* free local symbols */
+      local_symbol = next_symbol->local;
+      while(local_symbol) {
+         if (local_symbol->name) free(local_symbol->name);
+         current_symbol = local_symbol;
+         local_symbol = local_symbol->local;
+         free(current_symbol);
+      }
+      /* free global symbol */
       current_symbol = next_symbol;
       next_symbol = current_symbol->global;
       if (current_symbol->name) free(current_symbol->name);
@@ -351,9 +401,29 @@ char *get_identifier() {
    if (line[column]==':')
       column++;
    name = malloc(len+1);
-   name[len] = 0;
-   if (name)
+   if (name) {
+      name[len] = 0;
       strncpy(name, &line[start], len);
+   }
+   return name;
+}
+
+char *get_local_identifier() {
+   char *name;
+   unsigned char len = 0;
+   unsigned char start = column;
+   while (isalnum(line[column]) || line[column] == '@') {
+      len++;
+      column++;
+   }
+   // skip trailing column
+   if (line[column]==':')
+      column++;
+   name = malloc(len+1);
+   if (name) {
+      name[len] = 0;
+      strncpy(name, &line[start], len);
+   }
    return name;
 }
 
@@ -476,7 +546,18 @@ struct token *get_token() {
       if (sym)
          return make_token(TOKEN_IDENT, sym->value, label);
       /* 32767 is dummy value for the forward reference */
-      return make_token(TOKEN_IDENT, 32767, label);
+      if (pass == 1)
+         return make_token(TOKEN_IDENT, 32767, label);
+   }
+   /* local identifier */
+   if (line[column] == '@') {
+      label = get_local_identifier();
+      sym = find_local_symbol(label);
+      if (sym)
+         return make_token(TOKEN_LOCAL, sym->value, label);
+      /* forward reference */
+      if (pass == 1)
+         return make_token(TOKEN_LOCAL, 32767, label);
    }
    return make_token(TOKEN_UNKNOWN, 0, 0);
 }
@@ -492,6 +573,9 @@ int factor() {
    if(opt_debug >= 3)
       printf("factor() tok_global->id %d\n", tok_global->id);
    if (tok_global->id == TOKEN_IDENT) {
+      l_value = tok_global->value;
+      tok_global = get_token();
+   } else if (tok_global->id == TOKEN_LOCAL) {
       l_value = tok_global->value;
       tok_global = get_token();
    } else if (tok_global->id == TOKEN_NUMBER) {
@@ -828,7 +912,6 @@ void parse_line(void) {
    unsigned char code;
    struct macro *mac;
    struct macro_param *next_param;
-
    tok = get_token();
    /* empty line or comment line */
    if (tok->id == TOKEN_EOL || tok->id == TOKEN_COMMENT) {
@@ -854,7 +937,12 @@ void parse_line(void) {
          tok = tok_global;
       } else {
          make_symbol(tok_prev->label, PC);
+         last_label = find_symbol(tok_prev->label);
       }
+   /* local label */
+   } else if (tok->id == TOKEN_LOCAL && if_supress == 0) {
+      make_local_symbol(tok->label, PC);
+      tok = get_token();
    }
    /* check eol and comment */
    if (tok->id == TOKEN_EOL || tok->id == TOKEN_COMMENT) {
@@ -1249,6 +1337,7 @@ int main(int argc, char *argv[]) {
    }
    PC = 0;
    pass = 2;
+   last_label = NULL;
    printf("*** Pass #2 ***\n");
    close_file(file_cur);
    open_file(file_cur);
