@@ -205,10 +205,10 @@ void print_symbols(void) {
       symbol2 = symbol1->global;
       if (symbol1 && symbol2) {
          printf("%20s %04X %20s %04X\n", symbol1->name, symbol1->value, symbol2->name, symbol2->value);
-	 symbol1 = symbol2->global;
+         symbol1 = symbol2->global;
       } else if (symbol1) {
          printf("%15s %04X\n", symbol1->name, symbol1->value);
-	 symbol1 = NULL;
+         symbol1 = NULL;
       }
    }
 }
@@ -252,7 +252,7 @@ void sort_symbols(void) {
       j = i;
       while (j > 0 && (get_symbol(j-1)->value) > (get_symbol(j)->value)) {
          swap_symbols(get_symbol(j), get_symbol(j-1));
-	 j--;
+         j--;
       }
       i++;
    }
@@ -362,16 +362,18 @@ struct token *get_token() {
    char *str, *label;
    struct symbol *sym;
    struct macro *mac;
-
+   /* comment */
    if (column == 0) {
       if(is_comment(line[column]))
          return make_token(TOKEN_COMMENT, 0, 0);
    }
    skip_delimiter();
+   /* string */
    if (line[column] == '"') {
       str = get_string();
       return make_token(TOKEN_STRING, 0, str);
    }
+   /* number */
    if (line[column] == '%') {
       value = get_binary_number();
       return make_token(TOKEN_NUMBER, value, 0);
@@ -384,79 +386,87 @@ struct token *get_token() {
       value = get_dec_number();
       return make_token(TOKEN_NUMBER, value, 0);
    }
+   /* command */
    if ((cmd=get_command()) != NOT_FOUND) {
       return make_token(TOKEN_CMD, cmd, strdup(instructions[cmd].mnemonic)); 
    }
-   if (line[column] == 'A' && !isalnum(line[column+1])) {
-      column++;
-      return make_token(TOKEN_A, 0, 0);
-   }
-   if (line[column] == 'X' && !isalnum(line[column+1])) {
-      column++;
-      return make_token(TOKEN_X, 0, 0);
-   }
-   if (line[column] == 'Y' && !isalnum(line[column+1])) {
-      column++;
-      return make_token(TOKEN_Y, 0, 0);
-   }
-   if (line[column] == '\'' && isprint(line[column+1])) {
-      value = line[column+1];
-      if (line[column+2] == '\'') column += 3; else column += 2;
-      return make_token(TOKEN_CHAR, value, 0);
-   }
+   /* a bunch of other tokens */
    switch(line[column]) {
+      case 'A':
+         if(!isalnum(line[column+1])) {
+            column++;
+            return make_token(TOKEN_A, 0, 0);
+         }
+         break;
+      case 'X':
+         if(!isalnum(line[column+1])) {
+            column++;
+            return make_token(TOKEN_X, 0, 0);
+         }
+         break;
+      case 'Y':
+         if(!isalnum(line[column+1])) {
+            column++;
+            return make_token(TOKEN_Y, 0, 0);
+         }
+         break;
+      case '\'': 
+         if(isprint(line[column+1])) {
+            value = line[column+1];
+            if (line[column+2] == '\'') column += 3; else column += 2;
+            return make_token(TOKEN_CHAR, value, 0);
+         }
+         break;
       case 0:
-	 return make_token(TOKEN_EOL, 0, 0);
+         return make_token(TOKEN_EOL, 0, 0);
       case '\n':
          column++;
-	 return make_token(TOKEN_EOL, 0, 0);
+         return make_token(TOKEN_EOL, 0, 0);
       case '\r':
          column++;
-	 return make_token(TOKEN_EOL, 0, 0);
+         return make_token(TOKEN_EOL, 0, 0);
       case '#':
          column++;
-	 return make_token(TOKEN_HASH, 0, 0);
+         return make_token(TOKEN_HASH, 0, 0);
       case ',':
-	 column++;
-	 return make_token(TOKEN_COMMA, 0, 0);
+         column++;
+         return make_token(TOKEN_COMMA, 0, 0);
       case '(':
-	 column++;
-	 return make_token(TOKEN_LPAREN, 0, 0);
+         column++;
+         return make_token(TOKEN_LPAREN, 0, 0);
       case ')':
-	 column++;
-	 return make_token(TOKEN_RPAREN, 0, 0);
+         column++;
+         return make_token(TOKEN_RPAREN, 0, 0);
       case '*':
-	 column++;
-	 return make_token(TOKEN_MUL, 0, 0);
+         column++;
+         return make_token(TOKEN_MUL, 0, 0);
       case '<':
-	 column++;
-	 return make_token(TOKEN_LOW, 0, 0);
+         column++;
+         return make_token(TOKEN_LOW, 0, 0);
       case '>':
-	 column++;
-	 return make_token(TOKEN_HIGH, 0, 0);
+         column++;
+         return make_token(TOKEN_HIGH, 0, 0);
       case '+':
-	 column++;
-	 return make_token(TOKEN_PLUS, 0, 0);
+         column++;
+         return make_token(TOKEN_PLUS, 0, 0);
       case '-':
-	 column++;
-	 return make_token(TOKEN_MINUS, 0, 0);
+         column++;
+         return make_token(TOKEN_MINUS, 0, 0);
       case '/':
-	 column++;
-	 return make_token(TOKEN_DIV, 0, 0);
+         column++;
+         return make_token(TOKEN_DIV, 0, 0);
       case '=':
-	 column++;
-	 return make_token(TOKEN_EQU, 0, 0);
+         column++;
+         return make_token(TOKEN_EQU, 0, 0);
       case ';':
-	 column++;
-	 return make_token(TOKEN_COMMENT, 0, 0);
+         column++;
+         return make_token(TOKEN_COMMENT, 0, 0);
       case '.':
          if ((cmd = get_pseudo_func()) != NOT_FOUND) {
             return make_token(TOKEN_PSEUDO, cmd, strdup(functions[cmd].name)); 
          } else error(INVALID_CMD);
-         // to be removed
-	 // column++;
-	 // return make_token(TOKEN_DOT, 0, 0);
    }
+   /* identifier */
    if (isalpha(line[column])) {
       label = get_identifier();
       mac = find_macro(label);
@@ -465,10 +475,9 @@ struct token *get_token() {
       sym = find_symbol(label);
       if (sym)
          return make_token(TOKEN_IDENT, sym->value, label);
-      /* 32768 is dummy value for the forward reference */
+      /* 32767 is dummy value for the forward reference */
       return make_token(TOKEN_IDENT, 32767, label);
    }
-   // printf("unknown\n");
    return make_token(TOKEN_UNKNOWN, 0, 0);
 }
 
@@ -647,10 +656,10 @@ void parse_macro_params(struct macro *mac) {
    while((str = parse_macro_param()) != 0) {
       new_param = malloc(sizeof(struct macro_param));
       if(new_param) {
-	 new_param->str = str;
-	 new_param->next = NULL;
+         new_param->str = str;
+         new_param->next = NULL;
          if (mac->param == NULL) mac->param = new_param; else last_param->next = new_param;
-	 last_param = new_param;
+         last_param = new_param;
       } else error(OUT_OF_MEMORY);
    }
 }
@@ -760,7 +769,7 @@ void make_macro(char *name) {
       while(read_line(file_cur) != 0) {
          /* check of end macro definition */
          column = 0;
-	 strcpy(&cline[0], &line[0]);
+         strcpy(&cline[0], &line[0]);
          strupper(&line[0]);
          tok = get_token();
          if (tok->id == TOKEN_PSEUDO && tok->value == ENDMAC)
@@ -788,7 +797,7 @@ void print_macros(void) {
       line = next_macro->line;
       while(line) {
          printf("%s", line->str);
-	 line = line->next;
+         line = line->next;
       }
       next_macro = next_macro->next;
    }
@@ -802,9 +811,9 @@ void free_macros(void) {
       next_line = next_macro->line;
       while(next_line) {
          free(next_line->str);
-	 current_line = next_line;
-	 next_line = next_line->next;
-	 free(current_line);
+         current_line = next_line;
+         next_line = next_line->next;
+         free(current_line);
       }
       current_macro = next_macro;
       next_macro = next_macro->next;
@@ -832,22 +841,17 @@ void parse_line(void) {
       mac = find_macro(tok_prev->label);
       if (mac) {
          if (opt_debug >= 2)
-            printf("expand macro: %d\n", file_cur->line_number);
-	 parse_macro_params(mac);
-	 expand_macro(mac);
-	 //next_param = mac->param;
-	 //while(next_param) {
-	 //   printf("%s\n", next_param->str);
-	 //   next_param = next_param->next;
-	 //}
-	 free_macro_params(mac);
-	 return;
+            printf("Expand macro: %d\n", file_cur->line_number - 1);
+         parse_macro_params(mac);
+         expand_macro(mac);
+         free_macro_params(mac);
+         return;
       }
       tok = get_token();
       if (tok->id == TOKEN_EQU) {
          value = eval();
-	 make_symbol(tok_prev->label, value);
-	 tok = tok_global;
+         make_symbol(tok_prev->label, value);
+         tok = tok_global;
       } else {
          make_symbol(tok_prev->label, PC);
       }
@@ -861,9 +865,9 @@ void parse_line(void) {
    if (tok->id == TOKEN_PSEUDO) {
       if (tok->value == MACRO) {
          tok = get_token();
-	 if (tok->id == TOKEN_IDENT) {
-	    make_macro(tok->label);
-	 } else error(SYNTAX_ERROR);
+         if (tok->id == TOKEN_IDENT) {
+            make_macro(tok->label);
+         } else error(SYNTAX_ERROR);
       } else {
          functions[tok->value].func();
       }
@@ -879,139 +883,139 @@ void parse_line(void) {
       inst = instructions[tok->value];
       tok = get_token();
       if (tok->id == TOKEN_EOL ||
-	  tok->id == TOKEN_COMMENT ||
-	  tok->id == TOKEN_A)
+          tok->id == TOKEN_COMMENT ||
+          tok->id == TOKEN_A)
       {
-	 /* implied mode */
-	 if (inst.addr_modes & NONE) {
-	    code = inst.op_code;
+         /* implied mode */
+         if (inst.addr_modes & NONE) {
+            code = inst.op_code;
             if (opt_debug >= 3) printf("implied mode: %x\n", code);
-	    emit1(code);
-	 /* accumulator mode */
+            emit1(code);
+         /* accumulator mode */
          } else if (inst.addr_modes & ACC) {
-	    code = inst.op_code + 8;
+            code = inst.op_code + 8;
             if (opt_debug >= 3) printf("accumulator mode: %x\n", code);
-	    emit1(code);
-	 } else {
+            emit1(code);
+         } else {
             error(INVALID_MODE);
          }
-	 return; // new
+         return; // new
       /* immediate mode */
       } else if (tok->id == TOKEN_HASH) {
-	 value = eval();
-	 if (inst.addr_modes & IMM) {
+         value = eval();
+         if (inst.addr_modes & IMM) {
             code = inst.op_code + 8;
             if (opt_debug >= 3) printf("immediate mode1: %x %x\n", code, value);
-	    emit2(code, value%256);
-	 } else if (inst.addr_modes & IMM2) {
+            emit2(code, value%256);
+         } else if (inst.addr_modes & IMM2) {
             code = inst.op_code + 0;
             if (opt_debug >= 3) printf("immediate mode2: %x %x\n", code, value);
-	    emit2(code, value%256);
-	 } else {
-	    error(INVALID_MODE);
-	 }
-	 tok = tok_global; // new
+            emit2(code, value%256);
+         } else {
+            error(INVALID_MODE);
+         }
+         tok = tok_global; // new
       /* relative mode */
       } else if (inst.addr_modes & REL) {
-	 code = inst.op_code + 0;
-	 value = eval1(tok);
-	 value = value - PC - 2;
-	 if (pass == 2 && (value < -128 || value > 127))
-	    error(INVALID_BRANCH);
-	 if ( value < 0)
-	    value = 256 + value;
-	 if (opt_debug >= 3) printf("relative mode: %x %x\n", code, value);
-	 emit2(code, value%256);
-	 tok = tok_global; // new
+         code = inst.op_code + 0;
+         value = eval1(tok);
+         value = value - PC - 2;
+         if (pass == 2 && (value < -128 || value > 127))
+            error(INVALID_BRANCH);
+         if ( value < 0)
+            value = 256 + value;
+         if (opt_debug >= 3) printf("relative mode: %x %x\n", code, value);
+         emit2(code, value%256);
+         tok = tok_global; // new
       } else if (tok->id == TOKEN_LPAREN) {
          value = eval();
-	 tok = tok_global;
-	 /* (indirect,x) */
-	 if (tok->id == TOKEN_COMMA &&
-	     get_token()->id == TOKEN_X &&
-	     get_token()->id == TOKEN_RPAREN &&
-	     (inst.addr_modes & IND_X))
-	 {
-	    code = inst.op_code + 0;
-	    if (opt_debug >= 3) printf("(indirect,x) mode: %x %x\n", code, value);
-	    emit2(code, value%256);
-	 /* (absolute indirect */
-	 } else if (tok->id == TOKEN_RPAREN &&
-		    (inst.addr_modes & ABS_IND))
-	 {
-	    code = inst.op_code + 0x2c;
-	    if (opt_debug >= 3) printf("(absolute indirect) mode: %x %x %x\n", code, value%256, value/256);
-	    emit3(code, value%256, value/256);
-	 /* (indirect),y */
-	 } else if (tok->id == TOKEN_RPAREN &&
-		    get_token()->id == TOKEN_COMMA &&
-		    get_token()->id == TOKEN_Y &&
-		    (inst.addr_modes & IND_Y))
-	 {
-	    code = inst.op_code + 0x10;
-	    if (opt_debug >= 3) printf("(indirect),y mode: %x %x\n", code, value);
-	    emit2(code, value%256);
-	 } else {
-	    error(INVALID_MODE);
-	 }
-	 tok = get_token(); // new
+         tok = tok_global;
+         /* (indirect,x) */
+         if (tok->id == TOKEN_COMMA &&
+             get_token()->id == TOKEN_X &&
+             get_token()->id == TOKEN_RPAREN &&
+             (inst.addr_modes & IND_X))
+         {
+            code = inst.op_code + 0;
+            if (opt_debug >= 3) printf("(indirect,x) mode: %x %x\n", code, value);
+            emit2(code, value%256);
+         /* (absolute indirect */
+         } else if (tok->id == TOKEN_RPAREN &&
+                    (inst.addr_modes & ABS_IND))
+         {
+            code = inst.op_code + 0x2c;
+            if (opt_debug >= 3) printf("(absolute indirect) mode: %x %x %x\n", code, value%256, value/256);
+            emit3(code, value%256, value/256);
+         /* (indirect),y */
+         } else if (tok->id == TOKEN_RPAREN &&
+                    get_token()->id == TOKEN_COMMA &&
+                    get_token()->id == TOKEN_Y &&
+                    (inst.addr_modes & IND_Y))
+         {
+            code = inst.op_code + 0x10;
+            if (opt_debug >= 3) printf("(indirect),y mode: %x %x\n", code, value);
+            emit2(code, value%256);
+         } else {
+            error(INVALID_MODE);
+         }
+         tok = get_token(); // new
       /* addressing mode should be zp, zp_x, zp_y, abs, abs_x, abs_y, or abs_y2 */
       } else {
          value = eval1(tok);
-	 tok = tok_global;
-	 /* addressing mode should be zp_x, zp_y, abs_x, abs_y, or abs_y2 */
-	 if (tok->id == TOKEN_COMMA) {
-	    tok = get_token();
-	    /* addressing mode should be zp_x or abs_x */
-	    if (tok->id == TOKEN_X) {
-	       if (value < 256 && (inst.addr_modes & ZP_X)) {
-	          code = inst.op_code + 0x14;
-		  if (opt_debug >= 3) printf("zp_x mode: %x %x\n", code, value);
-	          emit2(code, value);
-	       } else if (inst.addr_modes & ABS_X) {
-	          code = inst.op_code + 0x1c;
-		  if (opt_debug >= 3) printf("abs_x mode: %x %x %x\n", code, value%256, value/256);
-	          emit3(code, value%256, value/256);
-	       } else {
-	          error(INVALID_MODE);
-	       }
-	    /* addressing mode should be zp_y, abs_y, or abs_y2 */
-	    } else if (tok->id == TOKEN_Y) {
-	       if (value < 256 && (inst.addr_modes & ZP_Y)) {
-	          code = inst.op_code + 0x14;
-		  if (opt_debug >= 3) printf("zp_y mode: %x %x\n", code, value);
-	          emit2(code, value);
-	       } else if (inst.addr_modes & ABS_Y) {
-	          code = inst.op_code + 0x18;
-		  if (opt_debug >= 3) printf("abs_y mode: %x %x %x\n", code, value%256, value/256);
-	          emit3(code, value%256, value/256);
-	       } else if (inst.addr_modes & ABS_Y2) {
-	          code = inst.op_code + 0x1c;
-		  if (opt_debug >= 3) printf("abs_y2 mode: %x %x %x\n", code, value%256, value/256);
-	          emit3(code, value%256, value/256);
-	       } else {
-	          error(INVALID_MODE);
-	       }
-	    } else {
-	       error(INVALID_MODE);
-	    }
-	    tok = get_token(); // new
-	 /* addressing mode should be zp or abs */
-	 } else {
-	    /* zp addressing mode */
-	    if (value < 256 && (inst.addr_modes & ZP)) {
-	       code = inst.op_code + 0x4;
-	       if (opt_debug >= 3) printf("zp mode: %x %x\n", code, value);
-	       emit2(code, value);
-	    /* absolute addressing mode */
-	    } else if (inst.addr_modes & ABS ) {
-	       code = inst.op_code + 0xc;
-	       if (opt_debug >= 3) printf("absolute mode: %x, %x, %x\n", code, value%256, value/256);
-	       emit3(code, value%256, value/256);
-	    } else {
-	       error(INVALID_MODE);
-	    }
-	 }
+         tok = tok_global;
+         /* addressing mode should be zp_x, zp_y, abs_x, abs_y, or abs_y2 */
+         if (tok->id == TOKEN_COMMA) {
+            tok = get_token();
+            /* addressing mode should be zp_x or abs_x */
+            if (tok->id == TOKEN_X) {
+               if (value < 256 && (inst.addr_modes & ZP_X)) {
+                  code = inst.op_code + 0x14;
+                  if (opt_debug >= 3) printf("zp_x mode: %x %x\n", code, value);
+                  emit2(code, value);
+               } else if (inst.addr_modes & ABS_X) {
+                  code = inst.op_code + 0x1c;
+                  if (opt_debug >= 3) printf("abs_x mode: %x %x %x\n", code, value%256, value/256);
+                  emit3(code, value%256, value/256);
+               } else {
+                  error(INVALID_MODE);
+               }
+            /* addressing mode should be zp_y, abs_y, or abs_y2 */
+            } else if (tok->id == TOKEN_Y) {
+               if (value < 256 && (inst.addr_modes & ZP_Y)) {
+                  code = inst.op_code + 0x14;
+                  if (opt_debug >= 3) printf("zp_y mode: %x %x\n", code, value);
+                  emit2(code, value);
+               } else if (inst.addr_modes & ABS_Y) {
+                  code = inst.op_code + 0x18;
+                  if (opt_debug >= 3) printf("abs_y mode: %x %x %x\n", code, value%256, value/256);
+                  emit3(code, value%256, value/256);
+               } else if (inst.addr_modes & ABS_Y2) {
+                  code = inst.op_code + 0x1c;
+                  if (opt_debug >= 3) printf("abs_y2 mode: %x %x %x\n", code, value%256, value/256);
+                  emit3(code, value%256, value/256);
+               } else {
+                  error(INVALID_MODE);
+               }
+            } else {
+               error(INVALID_MODE);
+            }
+            tok = get_token(); // new
+         /* addressing mode should be zp or abs */
+         } else {
+            /* zp addressing mode */
+            if (value < 256 && (inst.addr_modes & ZP)) {
+               code = inst.op_code + 0x4;
+               if (opt_debug >= 3) printf("zp mode: %x %x\n", code, value);
+               emit2(code, value);
+            /* absolute addressing mode */
+            } else if (inst.addr_modes & ABS ) {
+               code = inst.op_code + 0xc;
+               if (opt_debug >= 3) printf("absolute mode: %x, %x, %x\n", code, value%256, value/256);
+               emit3(code, value%256, value/256);
+            } else {
+               error(INVALID_MODE);
+            }
+         }
       }
    } else {
       error(INVALID_CMD);
@@ -1030,12 +1034,12 @@ void handle_byte(void) {
       if (tok->id == TOKEN_STRING) {
          for (i = 0; i < strlen(tok->label); i++) {
             emit1(tok->label[i]);
-	 }
-	 tok = get_token();
+         }
+         tok = get_token();
       } else {
          value = eval1(tok);
-	 tok = tok_global;
-	 emit1(value%256);
+         tok = tok_global;
+         emit1(value%256);
       }
    } while (tok->id == TOKEN_COMMA);
 }
@@ -1077,7 +1081,7 @@ void handle_ifdef(void) {
    while (sym) {
       if (strcmp(sym->name, label)==0) {
          if_supress = 0;
-	 return;
+         return;
       }
       sym = sym->global;
    }
@@ -1093,7 +1097,7 @@ void handle_ifndef(void) {
    while (sym) {
       if (strcmp(sym->name, label)==0) {
          if_supress = 1;
-	 return;
+         return;
       }
       sym = sym->global;
    }
@@ -1192,25 +1196,25 @@ void parse_params(int argc, char *argv[]) {
    while (i < argc - 1) { // i = 1
       if (strncmp("-d", argv[i], 2) == 0 && (i < argc - 2)) {
          opt_debug = argv[i+1][0] - '0';
-	 i += 2;
+         i += 2;
       } else if (strncmp("-D", argv[i], 2) == 0 && (i < argc - 2)) {
          strcpy(&line[0], argv[i+1]);
-	 parse_line();
-	 i += 2;
+         parse_line();
+         i += 2;
       } else if (strncmp("-l", argv[i], 2) == 0 && i < (argc -2 )) {
          opt_list = 1;
-	 file_lst.name = argv[i+1];
-	 i += 2;
+         file_lst.name = argv[i+1];
+         i += 2;
       } else if (strncmp("-o", argv[i], 2) == 0 && i < (argc -2 )) {
-	 file_out.name = argv[i+1];
-	 i += 2;
+         file_out.name = argv[i+1];
+         i += 2;
       } else if (strncmp("-s", argv[i], 2) == 0) {
       printf("s");
-	 opt_symbol = 1;
-	 i += 1;
+         opt_symbol = 1;
+         i += 1;
       } else {
          usage();
-	 exit(1);
+         exit(1);
       }
    }
    if (opt_debug == 1) {
