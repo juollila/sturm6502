@@ -35,6 +35,11 @@
 	ENDM
 .endif
 
+.mac	lbeq
+	.byte	$d0,$3	; bne +3
+	jmp	\1	
+.endmac
+
 	.org	$c000-2
 	.word	$c000
 
@@ -45,19 +50,9 @@
 ;
 ; after our own routine we will jump
 ; to gone+3
-.ifdef 	igone			; this dummy ifdef is to test compiler
 	lda	igone
-.endif
-.ifndef foobar			; this dummy ifndef is to test compiler
 	sta	goneptr
-.endif
-.ifdef  foobar			; this dummy ifdef is to test compiler
-				; lda #0 is not compiled
-	lda	#0
-.endif
-.ifndef foobar			; this dummy ifndef is to test compiler
 	sta	saveptr
-.endif
 	lda	igone+1
 	sta	goneptr+1
 	sta	saveptr+1
@@ -91,10 +86,10 @@ checkCommand
 	jsr	chrget
 	php
 	cmp	#"@"
-	; lbeq	atcommand
-        bne	skip
-        jmp	atcommand
-skip
+	lbeq	atcommand
+;        bne	skip
+;        jmp	atcommand
+;skip
 	cmp	#$ad	; / basic token
 	; lbeq	loadBasic
         bne	skip2

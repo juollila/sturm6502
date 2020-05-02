@@ -45,7 +45,9 @@ enum {
    TOKEN_STRING,
    TOKEN_DOT,
    TOKEN_PSEUDO,
-   TOKEN_CHAR
+   TOKEN_CHAR,
+   TOKEN_PARAM,
+   TOKEN_UNKNOWN
 };
 /* error messages */
 enum {
@@ -57,7 +59,10 @@ enum {
    OPEN_ERROR,
    INVALID_BRANCH,
    INVALID_OPTION,
-   READ_ERROR
+   READ_ERROR,
+   INTERNAL_ERROR,
+   INVALID_MACRO,
+   OUT_OF_MEMORY
 };
 
 char *error_msg[] = {
@@ -69,17 +74,39 @@ char *error_msg[] = {
    "Cannot open file",
    "Branch out of range",
    "Value missing",
-   "Cannot read file"
+   "Cannot read file",
+   "Internal error",
+   "Macro already exist",
+   "Out of memory"
 };
 
 
-char *delimiter_chars = "\t \n:";
+char *delimiter_chars = "\t :";
 char *comment_chars = ";*";
+
+struct macro_param {
+   char *str;
+   struct macro_param *next;
+};
+
+struct macro_line {
+   char *str;
+   struct macro_line *next;
+};
+
+struct macro {
+   char *name;
+   struct macro_param *param;
+   struct macro_line *line;
+   struct symbol *local; /* local next symbol */
+   struct macro *next;
+};
 
 struct token {
    unsigned int id;
    int value;
    char *label;
+   struct macro *mac;
    struct token *next;
 };
 
@@ -168,30 +195,32 @@ struct instruction instructions[] = {
 };
 
 void handle_byte(void);
-void handle_org(void);
-void handle_word(void);
-void not_imp(void);
+void handle_else(void);
+void handle_endif(void);
+void handle_endmac(void);
 void handle_if(void);
 void handle_ifdef(void);
 void handle_ifndef(void);
 void handle_incbin(void);
 void handle_include(void);
-void handle_endif(void);
-void handle_else(void);
+void handle_mac(void);
+void handle_org(void);
+void handle_word(void);
 
 struct pseudo_func functions[] = {
    { ".BYTE", &handle_byte },
    { ".ELSE", &handle_else },
    { ".ENDIF", &handle_endif },
-   { ".ENDMAC", &not_imp },
+   { ".ENDMAC", &handle_endmac }, /* number 3 */
    { ".IF", &handle_if },
    { ".IFDEF", &handle_ifdef },
    { ".IFNDEF", &handle_ifndef },
    { ".INCBIN", &handle_incbin },
    { ".INCLUDE", &handle_include },
-   { ".MAC", &not_imp },
+   { ".MAC", &handle_mac }, /* number 9 */
    { ".ORG", &handle_org },
    { ".WORD", &handle_word }
 };
 
-
+#define ENDMAC 3
+#define MACRO 9

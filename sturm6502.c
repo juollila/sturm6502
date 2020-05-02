@@ -1,7 +1,7 @@
 /*
  *
  *    Sturm6502
- *    Minimal assembler for 6502
+ *    Minimal macro assembler for 6502
  *
  *    Coded by Juha Ollila
  *
@@ -16,6 +16,8 @@
 
 
 int eval();
+struct macro *find_macro(char *);
+void parse_line(void);
 
 struct file *file_cur; /* current file */
 struct file file_asm;
@@ -25,10 +27,13 @@ struct file file_bin; /* incbin file */
 
 char line[MAX_LINE_LEN];
 char cline[MAX_LINE_LEN]; /* line with preversed case */
-unsigned char column, pass, opt_debug, opt_list, opt_symbol, if_supress, if_seen;
+unsigned char column, pass;
+unsigned char opt_debug, opt_list, opt_symbol;
+unsigned char if_supress, if_seen;
 unsigned int PC;
 struct symbol *symbols, *last_symbol;
 struct token *tokens, *last_token, *tok_global;
+struct macro *macros, *last_macro;
 
 /* for unit tests */
 char unit_obj[3];
@@ -53,6 +58,8 @@ void init(void) {
    last_symbol = NULL;
    tokens = NULL;
    last_token = NULL;
+   macros = NULL;
+   last_macro = NULL;
    opt_debug = 0;
    opt_list = 0;
    opt_symbol = 0;
@@ -350,11 +357,11 @@ char *get_identifier() {
    return name;
 }
 
-
 struct token *get_token() {
    int value, cmd;
    char *str, *label;
-   struct symbol *sym = symbols;
+   struct symbol *sym;
+   struct macro *mac;
 
    if (column == 0) {
       if(is_comment(line[column]))
@@ -398,6 +405,14 @@ struct token *get_token() {
       return make_token(TOKEN_CHAR, value, 0);
    }
    switch(line[column]) {
+      case 0:
+	 return make_token(TOKEN_EOL, 0, 0);
+      case '\n':
+         column++;
+	 return make_token(TOKEN_EOL, 0, 0);
+      case '\r':
+         column++;
+	 return make_token(TOKEN_EOL, 0, 0);
       case '#':
          column++;
 	 return make_token(TOKEN_HASH, 0, 0);
@@ -437,22 +452,24 @@ struct token *get_token() {
       case '.':
          if ((cmd = get_pseudo_func()) != NOT_FOUND) {
             return make_token(TOKEN_PSEUDO, cmd, strdup(functions[cmd].name)); 
-         }
+         } else error(INVALID_CMD);
          // to be removed
-	 column++;
-	 return make_token(TOKEN_DOT, 0, 0);
+	 // column++;
+	 // return make_token(TOKEN_DOT, 0, 0);
    }
    if (isalpha(line[column])) {
       label = get_identifier();
-      while (sym) {
-         if (strcmp(sym->name, label)==0)
-            return make_token(TOKEN_IDENT, sym->value, label);
-	 sym = sym->global;
-      }
+      mac = find_macro(label);
+      if (mac)
+         return make_token(TOKEN_IDENT, 0, label);
+      sym = find_symbol(label);
+      if (sym)
+         return make_token(TOKEN_IDENT, sym->value, label);
       /* 32768 is dummy value for the forward reference */
       return make_token(TOKEN_IDENT, 32767, label);
    }
-   return make_token(TOKEN_EOL, 0, 0);
+   // printf("unknown\n");
+   return make_token(TOKEN_UNKNOWN, 0, 0);
 }
 
 void expect_token(unsigned int id) {
@@ -552,7 +569,7 @@ int eval() {
 
 void emit0(void) {
    #ifndef UNIT_TEST
-   if (pass == 2 && opt_debug >= 2)
+   if (opt_debug >= 2)
       printf("%05d %04X          %s", file_cur->line_number - 1, PC, &cline[0]);
    #endif
 }
@@ -563,7 +580,7 @@ void emit1(unsigned char b1) {
    unit_obj[1]=0xf2;
    unit_obj[2]=0xf2;
    #else
-   if (pass == 2 && opt_debug >= 2)
+   if (opt_debug >= 2)
       printf("%05d %04X %02X       %s", file_cur->line_number - 1, PC, b1, &cline[0]);
    if (pass == 2)
       if (fputc(b1, file_out.file) == EOF) error(WRITE_ERROR);
@@ -577,7 +594,7 @@ void emit2(unsigned char b1, unsigned char b2) {
    unit_obj[1]=b2;
    unit_obj[2]=0xf2;
    #else
-   if (pass == 2 && opt_debug >= 2)
+   if (opt_debug >= 2)
       printf("%05d %04X %02X %02X    %s", file_cur->line_number - 1, PC, b1, b2, &cline[0]);
    if (pass == 2) {
       if (fputc(b1, file_out.file) == EOF) error(WRITE_ERROR);
@@ -593,7 +610,7 @@ void emit3(unsigned char b1, unsigned char b2, unsigned char b3) {
    unit_obj[1]=b2;
    unit_obj[2]=b3;
    #else
-   if (pass == 2 && opt_debug >= 2)
+   if (opt_debug >= 2)
       printf("%05d %04X %02X %02X %02X %s", file_cur->line_number - 1, PC, b1, b2, b3, &cline[0]);
    if (pass == 2) {
       if (fputc(b1, file_out.file) == EOF) error(WRITE_ERROR);
@@ -604,11 +621,204 @@ void emit3(unsigned char b1, unsigned char b2, unsigned char b3) {
    PC = PC + 3;
 }
 
+char *parse_macro_param() {
+   char *param;
+   unsigned char len = 0;
+   unsigned char start = column;
+   while (line[column] && line[column]!=',' && line[column]!='\n' && line[column]!='\r' ) {
+      len++;
+      column++;
+   }
+   // skip trailing comma
+   if (line[column]==',')
+      column++;
+   if (len == 0)
+      return 0;
+   param = malloc(len+1);
+   param[len] = 0;
+   if (param)
+      strncpy(param, &line[start], len);
+   return param;
+}
+
+void parse_macro_params(struct macro *mac) {
+   char *str;
+   struct macro_param *new_param, *last_param;
+   while((str = parse_macro_param()) != 0) {
+      new_param = malloc(sizeof(struct macro_param));
+      if(new_param) {
+	 new_param->str = str;
+	 new_param->next = NULL;
+         if (mac->param == NULL) mac->param = new_param; else last_param->next = new_param;
+	 last_param = new_param;
+      } else error(OUT_OF_MEMORY);
+   }
+}
+
+struct macro_param *get_macro_param(struct macro *mac, unsigned int j) {
+   struct macro_param *param;
+   unsigned int i = 0;
+   if (j > 9)
+      return NULL;
+   param = mac->param;
+   while(i < j && param) {
+      i++;
+      param = param->next;
+   }
+   return param;
+}
+
+void expand_macro(struct macro *mac) {
+   unsigned char c, num, src_len, i, j, k;
+   struct macro_param *param;
+   struct macro_line *mac_line;
+   mac_line = mac->line;
+   while (mac_line) {
+      src_len = strlen(mac_line->str);
+      i = 0;
+      j = 0;
+      while(i < src_len) {
+         c = mac_line->str[i++];
+         if(c == '\\') {
+            num = mac_line->str[i++] - '1';
+            param = get_macro_param(mac, num);
+            k = 0;
+            while(param && k < strlen(param->str))
+               line[j++] = param->str[k++];
+        } else {
+           line[j++] = c;
+        }
+     }
+     line[j] = 0;
+     strcpy(&cline[0], &line[0]);
+     strupper(&line[0]);
+     column = 0;
+     if (opt_debug >= 2)
+        printf("%s", &line[0]);
+     parse_line();
+     free_tokens();
+     mac_line = mac_line->next;
+  }
+}
+
+void free_macro_params(struct macro *mac) {
+   struct macro_param *next_param, *current_param;
+   next_param = mac->param;
+   while(next_param) {
+      free(next_param->str);
+      current_param = next_param;
+      next_param = next_param->next;
+      free(current_param);
+   }
+   mac->param = NULL;
+}
+
+struct macro *find_macro(char *name) {
+   struct macro *next_macro = macros;
+   while (next_macro) {
+      if (strcmp(name, next_macro->name) == 0)
+         return next_macro;
+      next_macro = next_macro->next;
+   }
+   return NULL;
+}
+
+void make_macro(char *name) {
+   struct macro *new_macro;
+   char *macro_name;
+   char *text;
+   struct macro_line *last_line;
+   struct macro_line *new_line;
+   struct token *tok;
+   /* if pass 2 then skip macro definition */
+   while(pass == 2 && read_line(file_cur) != 0) {
+      /* check of end macro definition */
+      column = 0;
+      strupper(&line[0]);
+      tok = get_token();
+      if(opt_debug >= 2)
+         printf("skipping macro\n");
+      if (tok->id == TOKEN_PSEUDO && tok->value == ENDMAC)
+         return;
+   }
+   /* check if macro already exist */
+   if((new_macro=find_macro(name))!=0)
+      error(INVALID_MACRO);
+   /* new macro */
+   new_macro = malloc(sizeof(struct macro));
+   macro_name = strdup(name);
+   if (new_macro && macro_name) {
+      if (last_macro) last_macro->next = new_macro; else macros = new_macro;
+      new_macro->name = macro_name;
+      new_macro->param = NULL;
+      new_macro->line = NULL;
+      new_macro->local = NULL;
+      new_macro->next = NULL;
+      last_macro = new_macro;
+      /* process each line */
+      last_line = new_macro->line;
+      while(read_line(file_cur) != 0) {
+         /* check of end macro definition */
+         column = 0;
+	 strcpy(&cline[0], &line[0]);
+         strupper(&line[0]);
+         tok = get_token();
+         if (tok->id == TOKEN_PSEUDO && tok->value == ENDMAC)
+            return;
+         /* copy line */
+         text = strdup(&cline[0]);
+         new_line = malloc(sizeof(struct macro_line));
+         if (text && new_line) {
+            if (last_line) last_line->next = new_line; else new_macro->line = new_line;
+            new_line->str = text;
+            new_line->next = NULL;
+            last_line = new_line;
+         } else error(OUT_OF_MEMORY);
+      }
+   } else error(OUT_OF_MEMORY);
+}
+
+void print_macros(void) {
+   struct macro *next_macro;
+   struct macro_line *line;
+   next_macro = macros;
+   printf("*** Macros  ***\n");
+   while (next_macro) {
+      printf("Macro %s:\n", next_macro->name);
+      line = next_macro->line;
+      while(line) {
+         printf("%s", line->str);
+	 line = line->next;
+      }
+      next_macro = next_macro->next;
+   }
+}
+
+void free_macros(void) {
+   struct macro *next_macro = macros;
+   struct macro *current_macro;
+   struct macro_line *next_line, *current_line;
+   while (next_macro) {
+      next_line = next_macro->line;
+      while(next_line) {
+         free(next_line->str);
+	 current_line = next_line;
+	 next_line = next_line->next;
+	 free(current_line);
+      }
+      current_macro = next_macro;
+      next_macro = next_macro->next;
+      free(current_macro);
+   }
+}
+
 void parse_line(void) {
    struct token *tok_prev, *tok;
    int value;
    struct instruction inst;
    unsigned char code;
+   struct macro *mac;
+   struct macro_param *next_param;
 
    tok = get_token();
    /* empty line or comment line */
@@ -616,9 +826,23 @@ void parse_line(void) {
       emit0();
       return;
    }
-   /* identifier i.e. equ or label */
+   /* identifier i.e. equ, macro or label */
    if (tok->id == TOKEN_IDENT && if_supress == 0) {
       tok_prev = tok;
+      mac = find_macro(tok_prev->label);
+      if (mac) {
+         if (opt_debug >= 2)
+            printf("expand macro: %d\n", file_cur->line_number);
+	 parse_macro_params(mac);
+	 expand_macro(mac);
+	 //next_param = mac->param;
+	 //while(next_param) {
+	 //   printf("%s\n", next_param->str);
+	 //   next_param = next_param->next;
+	 //}
+	 free_macro_params(mac);
+	 return;
+      }
       tok = get_token();
       if (tok->id == TOKEN_EQU) {
          value = eval();
@@ -635,7 +859,14 @@ void parse_line(void) {
    }
    /* pseudo function */
    if (tok->id == TOKEN_PSEUDO) {
-      functions[tok->value].func();
+      if (tok->value == MACRO) {
+         tok = get_token();
+	 if (tok->id == TOKEN_IDENT) {
+	    make_macro(tok->label);
+	 } else error(SYNTAX_ERROR);
+      } else {
+         functions[tok->value].func();
+      }
       return;
       // HACK!!! Does not work with all pseudo codes
       // tok = tok_global;
@@ -654,12 +885,12 @@ void parse_line(void) {
 	 /* implied mode */
 	 if (inst.addr_modes & NONE) {
 	    code = inst.op_code;
-            if (opt_debug >= 2) printf("implied mode: %x\n", code);
+            if (opt_debug >= 3) printf("implied mode: %x\n", code);
 	    emit1(code);
 	 /* accumulator mode */
          } else if (inst.addr_modes & ACC) {
 	    code = inst.op_code + 8;
-            if (opt_debug >= 2) printf("accumulator mode: %x\n", code);
+            if (opt_debug >= 3) printf("accumulator mode: %x\n", code);
 	    emit1(code);
 	 } else {
             error(INVALID_MODE);
@@ -670,11 +901,11 @@ void parse_line(void) {
 	 value = eval();
 	 if (inst.addr_modes & IMM) {
             code = inst.op_code + 8;
-            if (opt_debug >= 2) printf("immediate mode1: %x %x\n", code, value);
+            if (opt_debug >= 3) printf("immediate mode1: %x %x\n", code, value);
 	    emit2(code, value%256);
 	 } else if (inst.addr_modes & IMM2) {
             code = inst.op_code + 0;
-            if (opt_debug >= 2) printf("immediate mode2: %x %x\n", code, value);
+            if (opt_debug >= 3) printf("immediate mode2: %x %x\n", code, value);
 	    emit2(code, value%256);
 	 } else {
 	    error(INVALID_MODE);
@@ -689,7 +920,7 @@ void parse_line(void) {
 	    error(INVALID_BRANCH);
 	 if ( value < 0)
 	    value = 256 + value;
-	 if (opt_debug >= 2) printf("relative mode: %x %x\n", code, value);
+	 if (opt_debug >= 3) printf("relative mode: %x %x\n", code, value);
 	 emit2(code, value%256);
 	 tok = tok_global; // new
       } else if (tok->id == TOKEN_LPAREN) {
@@ -702,14 +933,14 @@ void parse_line(void) {
 	     (inst.addr_modes & IND_X))
 	 {
 	    code = inst.op_code + 0;
-	    if (opt_debug >= 2) printf("(indirect,x) mode: %x %x\n", code, value);
+	    if (opt_debug >= 3) printf("(indirect,x) mode: %x %x\n", code, value);
 	    emit2(code, value%256);
 	 /* (absolute indirect */
 	 } else if (tok->id == TOKEN_RPAREN &&
 		    (inst.addr_modes & ABS_IND))
 	 {
 	    code = inst.op_code + 0x2c;
-	    if (opt_debug >= 2) printf("(absolute indirect) mode: %x %x %x\n", code, value%256, value/256);
+	    if (opt_debug >= 3) printf("(absolute indirect) mode: %x %x %x\n", code, value%256, value/256);
 	    emit3(code, value%256, value/256);
 	 /* (indirect),y */
 	 } else if (tok->id == TOKEN_RPAREN &&
@@ -718,7 +949,7 @@ void parse_line(void) {
 		    (inst.addr_modes & IND_Y))
 	 {
 	    code = inst.op_code + 0x10;
-	    if (opt_debug >= 2) printf("(indirect),y mode: %x %x\n", code, value);
+	    if (opt_debug >= 3) printf("(indirect),y mode: %x %x\n", code, value);
 	    emit2(code, value%256);
 	 } else {
 	    error(INVALID_MODE);
@@ -735,11 +966,11 @@ void parse_line(void) {
 	    if (tok->id == TOKEN_X) {
 	       if (value < 256 && (inst.addr_modes & ZP_X)) {
 	          code = inst.op_code + 0x14;
-		  if (opt_debug >= 2) printf("zp_x mode: %x %x\n", code, value);
+		  if (opt_debug >= 3) printf("zp_x mode: %x %x\n", code, value);
 	          emit2(code, value);
 	       } else if (inst.addr_modes & ABS_X) {
 	          code = inst.op_code + 0x1c;
-		  if (opt_debug >= 2) printf("abs_x mode: %x %x %x\n", code, value%256, value/256);
+		  if (opt_debug >= 3) printf("abs_x mode: %x %x %x\n", code, value%256, value/256);
 	          emit3(code, value%256, value/256);
 	       } else {
 	          error(INVALID_MODE);
@@ -748,15 +979,15 @@ void parse_line(void) {
 	    } else if (tok->id == TOKEN_Y) {
 	       if (value < 256 && (inst.addr_modes & ZP_Y)) {
 	          code = inst.op_code + 0x14;
-		  if (opt_debug >= 2) printf("zp_y mode: %x %x\n", code, value);
+		  if (opt_debug >= 3) printf("zp_y mode: %x %x\n", code, value);
 	          emit2(code, value);
 	       } else if (inst.addr_modes & ABS_Y) {
 	          code = inst.op_code + 0x18;
-		  if (opt_debug >= 2) printf("abs_y mode: %x %x %x\n", code, value%256, value/256);
+		  if (opt_debug >= 3) printf("abs_y mode: %x %x %x\n", code, value%256, value/256);
 	          emit3(code, value%256, value/256);
 	       } else if (inst.addr_modes & ABS_Y2) {
 	          code = inst.op_code + 0x1c;
-		  if (opt_debug >= 2) printf("abs_y2 mode: %x %x %x\n", code, value%256, value/256);
+		  if (opt_debug >= 3) printf("abs_y2 mode: %x %x %x\n", code, value%256, value/256);
 	          emit3(code, value%256, value/256);
 	       } else {
 	          error(INVALID_MODE);
@@ -770,12 +1001,12 @@ void parse_line(void) {
 	    /* zp addressing mode */
 	    if (value < 256 && (inst.addr_modes & ZP)) {
 	       code = inst.op_code + 0x4;
-	       if (opt_debug >= 2) printf("zp mode: %x %x\n", code, value);
+	       if (opt_debug >= 3) printf("zp mode: %x %x\n", code, value);
 	       emit2(code, value);
 	    /* absolute addressing mode */
 	    } else if (inst.addr_modes & ABS ) {
 	       code = inst.op_code + 0xc;
-	       if (opt_debug >= 2) printf("absolute mode: %x, %x, %x\n", code, value%256, value/256);
+	       if (opt_debug >= 3) printf("absolute mode: %x, %x, %x\n", code, value%256, value/256);
 	       emit3(code, value%256, value/256);
 	    } else {
 	       error(INVALID_MODE);
@@ -807,6 +1038,24 @@ void handle_byte(void) {
 	 emit1(value%256);
       }
    } while (tok->id == TOKEN_COMMA);
+}
+
+void handle_else(void) {
+   if (if_seen == 1) {
+      if (if_supress == 0)
+         if_supress = 1;
+      else if_supress = 0;
+   } else error(SYNTAX_ERROR);
+}
+
+void handle_endif(void) {
+   if (if_seen == 1) {
+      if_supress = 0;
+      if_seen = 0;
+   } else error(SYNTAX_ERROR);
+}
+
+void handle_endmac(void) {
 }
 
 void handle_if(void) {
@@ -894,19 +1143,10 @@ void handle_include(void) {
    } else error(SYNTAX_ERROR);
 }
 
-void handle_else(void) {
-   if (if_seen == 1) {
-      if (if_supress == 0)
-         if_supress = 1;
-      else if_supress = 0;
-   } else error(SYNTAX_ERROR);
-}
-
-void handle_endif(void) {
-   if (if_seen == 1) {
-      if_supress = 0;
-      if_seen = 0;
-   } else error(SYNTAX_ERROR);
+void handle_mac(void) {
+   /* This call should not happen */
+   /* make_macro handles .mac */
+   error(INTERNAL_ERROR);
 }
 
 void handle_org(void) {
@@ -1025,6 +1265,9 @@ int main(int argc, char *argv[]) {
       sort_symbols();
       print_symbols();
    }
+   if(opt_debug >= 1)
+      print_macros();
+   free_macros();
    free_symbols();
    return 0;
 }
