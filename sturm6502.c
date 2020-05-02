@@ -258,7 +258,7 @@ void print_symbols(void) {
          printf("%20s %04X %20s %04X\n", symbol1->name, symbol1->value, symbol2->name, symbol2->value);
          symbol1 = symbol2->global;
       } else if (symbol1) {
-         printf("%15s %04X\n", symbol1->name, symbol1->value);
+         printf("%20s %04X\n", symbol1->name, symbol1->value);
          symbol1 = NULL;
       }
    }
@@ -927,7 +927,6 @@ void parse_line(void) {
    struct instruction inst;
    unsigned char code;
    struct macro *mac;
-   struct macro_param *next_param;
    tok = get_token();
    /* empty line or comment line */
    if (tok->id == TOKEN_EOL || tok->id == TOKEN_COMMENT) {
@@ -1291,10 +1290,10 @@ void not_imp(void) {
 void usage(void) {
    printf("Sturm6502 macro assembler\n\n");
    printf("Usage:          sturm6502 [options] sourcefile\n\n");
-   printf("-d #            debug level\n");
+   printf("-d #            debug level (1..3)\n");
    printf("-D label=value  define a numeric constant\n");
-   printf("-l name         generate list file\n");
-   printf("-o name         output file name\n");
+   printf("-l name         generate a list file\n");
+   printf("-o name         an object file's name\n");
    printf("-s              print symbols\n\n");
 }
 
@@ -1385,7 +1384,7 @@ int main(int argc, char *argv[]) {
    close_file(&file_out);
    if (pass == 2 && opt_list == 1)
       close_file(&file_lst);
-   if (opt_symbol) {
+   if (opt_symbol || opt_debug >=1 ) {
       sort_symbols();
       print_symbols();
    }
