@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 cc sturm6502.c -o sturm6502
-./sturm6502 -d 1 -o test/smoke/sturmdos.bin test/smoke/sturmdos.asm
+./sturm6502 -d 1 -l test/smoke/sturmdos.lst -o test/smoke/sturmdos.bin test/smoke/sturmdos.asm
 xxd test/smoke/sturmdos.bin > test/smoke/smoke.hex
 set +e
 diff test/smoke/expected.hex test/smoke/smoke.hex

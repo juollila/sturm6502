@@ -67,7 +67,8 @@ void init(void) {
    if_supress = 0;
    if_seen = 0;
    file_asm.mode = strdup("r");
-   file_lst.mode = strdup("r");
+   file_lst.mode = strdup("w");
+   file_lst.name = strdup("a.lst");
    file_bin.mode = strdup("r");
    file_out.mode = strdup("w");
    file_out.name = strdup("a.out");
@@ -663,7 +664,10 @@ int eval() {
 void emit0(void) {
    #ifndef UNIT_TEST
    if (opt_debug >= 2)
-      printf("%05d %04X          %s", file_cur->line_number - 1, PC, &cline[0]);
+      printf("%05d %04X          %s", file_cur->line_number, PC, &cline[0]);
+   if (pass == 2 & opt_list == 1)
+      if (fprintf(file_lst.file, "%05d %04X          %s", file_cur->line_number, PC, &cline[0]) < 0)
+         error(WRITE_ERROR);
    #endif
 }
 
@@ -674,7 +678,10 @@ void emit1(unsigned char b1) {
    unit_obj[2]=0xf2;
    #else
    if (opt_debug >= 2)
-      printf("%05d %04X %02X       %s", file_cur->line_number - 1, PC, b1, &cline[0]);
+      printf("%05d %04X %02X       %s", file_cur->line_number, PC, b1, &cline[0]);
+   if (pass == 2 & opt_list == 1)
+      if (fprintf(file_lst.file, "%05d %04X %02X       %s", file_cur->line_number, PC, b1, &cline[0]) < 0)
+         error(WRITE_ERROR);
    if (pass == 2)
       if (fputc(b1, file_out.file) == EOF) error(WRITE_ERROR);
    #endif
@@ -688,7 +695,10 @@ void emit2(unsigned char b1, unsigned char b2) {
    unit_obj[2]=0xf2;
    #else
    if (opt_debug >= 2)
-      printf("%05d %04X %02X %02X    %s", file_cur->line_number - 1, PC, b1, b2, &cline[0]);
+      printf("%05d %04X %02X %02X    %s", file_cur->line_number, PC, b1, b2, &cline[0]);
+   if (pass == 2 & opt_list == 1)
+      if (fprintf(file_lst.file, "%05d %04X %02X %02X    %s", file_cur->line_number, PC, b1, b2, &cline[0]) < 0)
+         error(WRITE_ERROR);
    if (pass == 2) {
       if (fputc(b1, file_out.file) == EOF) error(WRITE_ERROR);
       if (fputc(b2, file_out.file) == EOF) error(WRITE_ERROR);
@@ -704,7 +714,10 @@ void emit3(unsigned char b1, unsigned char b2, unsigned char b3) {
    unit_obj[2]=b3;
    #else
    if (opt_debug >= 2)
-      printf("%05d %04X %02X %02X %02X %s", file_cur->line_number - 1, PC, b1, b2, b3, &cline[0]);
+      printf("%05d %04X %02X %02X %02X %s", file_cur->line_number, PC, b1, b2, b3, &cline[0]);
+   if (pass == 2 & opt_list == 1)
+      if (fprintf(file_lst.file, "%05d %04X %02X %02X %02X %s", file_cur->line_number, PC, b1, b2, b3, &cline[0]) < 0)
+         error(WRITE_ERROR);
    if (pass == 2) {
       if (fputc(b1, file_out.file) == EOF) error(WRITE_ERROR);
       if (fputc(b2, file_out.file) == EOF) error(WRITE_ERROR);
@@ -718,19 +731,19 @@ char *parse_macro_param() {
    char *param;
    unsigned char len = 0;
    unsigned char start = column;
-   while (line[column] && line[column]!=',' && line[column]!='\n' && line[column]!='\r' ) {
+   while (cline[column] && cline[column]!=',' && cline[column]!='\n' && cline[column]!='\r' ) {
       len++;
       column++;
    }
    // skip trailing comma
-   if (line[column]==',')
+   if (cline[column]==',')
       column++;
    if (len == 0)
       return 0;
    param = malloc(len+1);
    param[len] = 0;
    if (param)
-      strncpy(param, &line[start], len);
+      strncpy(param, &cline[start], len);
    return param;
 }
 
@@ -823,9 +836,12 @@ void make_macro(char *name) {
    struct macro_line *last_line;
    struct macro_line *new_line;
    struct token *tok;
+   emit0();
    /* if pass 2 then skip macro definition */
    while(pass == 2 && read_line(file_cur) != 0) {
       /* check of end macro definition */
+      strcpy(&cline[0], &line[0]);
+      emit0();
       column = 0;
       strupper(&line[0]);
       tok = get_token();
@@ -924,7 +940,7 @@ void parse_line(void) {
       mac = find_macro(tok_prev->label);
       if (mac) {
          if (opt_debug >= 2)
-            printf("Expand macro: %d\n", file_cur->line_number - 1);
+            printf("Expand macro: %d\n", file_cur->line_number);
          parse_macro_params(mac);
          expand_macro(mac);
          free_macro_params(mac);
@@ -960,8 +976,6 @@ void parse_line(void) {
          functions[tok->value].func();
       }
       return;
-      // HACK!!! Does not work with all pseudo codes
-      // tok = tok_global;
    }
    /* check .if supressing is ongoing */
    if (if_supress == 1)
@@ -1133,6 +1147,7 @@ void handle_byte(void) {
 }
 
 void handle_else(void) {
+   emit0();
    if (if_seen == 1) {
       if (if_supress == 0)
          if_supress = 1;
@@ -1141,6 +1156,7 @@ void handle_else(void) {
 }
 
 void handle_endif(void) {
+   emit0();
    if (if_seen == 1) {
       if_supress = 0;
       if_seen = 0;
@@ -1148,10 +1164,14 @@ void handle_endif(void) {
 }
 
 void handle_endmac(void) {
+   /* This call should not happen */
+   /* make_macro handles .mac */
+   error(INTERNAL_ERROR);
 }
 
 void handle_if(void) {
    int value;
+   emit0();
    value = eval();
    if_seen = 1;
    if (value == 0)
@@ -1163,6 +1183,7 @@ void handle_if(void) {
 void handle_ifdef(void) {
    char *label;
    struct symbol *sym = symbols;
+   emit0();
    skip_delimiter();
    label = get_identifier();
    if_seen = 1;
@@ -1179,6 +1200,7 @@ void handle_ifdef(void) {
 void handle_ifndef(void) {
    char *label;
    struct symbol *sym = symbols;
+   emit0();
    skip_delimiter();
    label = get_identifier();
    if_seen = 1;
@@ -1197,6 +1219,7 @@ void handle_incbin(void) {
    int input;
    if (if_supress == 1)
       return;
+   emit0();
    tok = get_token();
    if (tok->id == TOKEN_STRING) {
       file_bin.name = tok->label;
@@ -1216,6 +1239,7 @@ void handle_include(void) {
 
    if (if_supress == 1)
       return;
+   emit0();
    tok = get_token();
    if (tok->id == TOKEN_STRING) {
       file_parent = file_cur;
@@ -1345,6 +1369,11 @@ int main(int argc, char *argv[]) {
       printf("*** Listing ***\n");
       printf("Line# Loc  Code     Line\n");
    }
+   if (pass == 2 && opt_list == 1) {
+      open_file(&file_lst);
+      if (fprintf(file_lst.file, "*** Listing ***\n") < 0) error(WRITE_ERROR);
+      if (fprintf(file_lst.file, "Line# Loc  Code     Line\n") < 0) error(WRITE_ERROR);
+   }
    while((str = read_line(file_cur)) != 0) {
       strcpy(&cline[0], &line[0]);
       strupper(&line[0]);
@@ -1354,6 +1383,8 @@ int main(int argc, char *argv[]) {
    }
    close_file(file_cur);
    close_file(&file_out);
+   if (pass == 2 && opt_list == 1)
+      close_file(&file_lst);
    if (opt_symbol) {
       sort_symbols();
       print_symbols();
