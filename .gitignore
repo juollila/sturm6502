@@ -8,4 +8,5 @@ test/smoke/sturmdos.bin
 test/unit/lcut/
 test/unit/test_asm
 test/unit/test_pseudo
+test/unit/test_exp
 test/smoke/sturmdos.lst

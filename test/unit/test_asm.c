@@ -1314,7 +1314,7 @@ void tc_sty3(lcut_tc_t *tc, void *data) {
 
 int main() {
    lcut_ts_t   *suite = NULL;
-   LCUT_TEST_BEGIN("Sturm6502 macro assembler", NULL, NULL);
+   LCUT_TEST_BEGIN("Sturm6502 macro assembler - part 1", NULL, NULL);
 
    LCUT_TS_INIT(suite, "ADC", NULL, NULL);
    LCUT_TC_ADD(suite, "ADC #1", tc_adc1, NULL, NULL, NULL);

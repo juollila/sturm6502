@@ -31,6 +31,28 @@ label1:  lda #$00    ; comment
 label2:  nop         ; comment
          clc
  
+LABELS
+======
+
+Label definitions are case insensitive and they must start at the beginning
+of the line. The label may end with a column ':' character, but is not
+required.
+
+A global label starts with a letter (a-z). The following characters shall be
+alphanumberic.
+
+Examples:
+Label1:
+START
+
+A local label starts with a '@' character. The following characters shall be
+alphanumeric. A local label is valid only between two global labels. It can
+not be used out of the local context.
+
+Examples:
+@LOCAL1:
+@skip
+
 COMMENTS
 ========
 
@@ -110,28 +132,6 @@ Example:
 .ENDMAC
 
 Terminates a macro definition.
-
-LABELS
-======
-
-Label definitions are case insensitive and they must start at the beginning
-of the line. The label may end with a column ':' character, but is not
-mandatory.
-
-A global label starts with a letter (a-z). The following characters shall be
-alphanumberic.
-
-Examples:
-Label1:
-START
-
-A local label starts with a '@' character. The following characters shall be
-alphanumeric. A local label is valid only between two global labels. It can
-not be used out of the local context.
-
-Examples:
-@LOCAL1:
-@skip
  
 EXPRESSIONS
 ===========

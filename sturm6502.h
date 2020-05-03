@@ -63,7 +63,9 @@ enum {
    READ_ERROR,
    INTERNAL_ERROR,
    INVALID_MACRO,
-   OUT_OF_MEMORY
+   OUT_OF_MEMORY,
+   DIV_0,
+   RIGHT_PAREN
 };
 
 char *error_msg[] = {
@@ -78,7 +80,9 @@ char *error_msg[] = {
    "Cannot read file",
    "Internal error",
    "Macro already exist",
-   "Out of memory"
+   "Out of memory",
+   "Division by zero",
+   "Right parenthesis expected"
 };
 
 

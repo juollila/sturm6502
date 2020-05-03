@@ -563,12 +563,6 @@ struct token *get_token() {
    return make_token(TOKEN_UNKNOWN, 0, 0);
 }
 
-void expect_token(unsigned int id) {
-   struct token *tok = get_token();
-   if (tok->id != id)
-      error(SYNTAX_ERROR);
-}
-
 int factor() {
    int l_value = 0;
    if(opt_debug >= 3)
@@ -590,7 +584,9 @@ int factor() {
       tok_global = get_token();
    } else if (tok_global->id == TOKEN_LPAREN) {
       l_value = eval();
-      expect_token(TOKEN_RPAREN);
+      if (tok_global->id != TOKEN_RPAREN)
+         error(RIGHT_PAREN);
+      tok_global = get_token();
    } else {
       error(INVALID_EXPR);
    }
@@ -600,7 +596,7 @@ int factor() {
 }
 
 int term() {
-   int l_value;
+   int l_value, r_value;
    if(opt_debug >= 3)
       printf("term() #1\n");
    l_value = factor();
@@ -612,7 +608,10 @@ int term() {
          l_value *= factor();
       } else {
          tok_global = get_token();
-         l_value = (int) (l_value / factor());
+         r_value = factor();
+         if (r_value != 0) 
+            l_value = (int) (l_value / r_value);
+         else error(DIV_0);
       }
    }
    return l_value;

@@ -3,7 +3,6 @@
 extern void parse_line(void);
 extern void init(void);
 extern char line[];
-extern char cline[];
 extern unsigned char unit_obj[];
 extern unsigned char column;
 extern unsigned int PC;
@@ -209,7 +208,7 @@ void tc_ifndef2(lcut_tc_t *tc, void *data) {
 
 int main() {
    lcut_ts_t   *suite = NULL;
-   LCUT_TEST_BEGIN("Sturm6502 macro assembler", NULL, NULL);
+   LCUT_TEST_BEGIN("Sturm6502 macro assembler - part 2", NULL, NULL);
 
    LCUT_TS_INIT(suite, ".BYTE", NULL, NULL);
    LCUT_TC_ADD(suite, ".BYTE #1", tc_byte1, NULL, NULL, NULL);
