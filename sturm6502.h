@@ -59,13 +59,17 @@ enum {
    WRITE_ERROR,
    OPEN_ERROR,
    INVALID_BRANCH,
-   INVALID_OPTION,
    READ_ERROR,
    INTERNAL_ERROR,
    INVALID_MACRO,
    OUT_OF_MEMORY,
-   DIV_0,
-   RIGHT_PAREN
+   INVALID_DIV,
+   INVALID_RPAREN,
+   INVALID_LOCAL,
+   INVALID_IDENT,
+   INVALID_IF,
+   INVALID_STRING,
+   INVALID_PSEUDO
 };
 
 char *error_msg[] = {
@@ -76,13 +80,17 @@ char *error_msg[] = {
    "Write to file failed",
    "Cannot open file",
    "Branch out of range",
-   "Value missing",
    "Cannot read file",
    "Internal error",
-   "Macro already exist",
+   "Macro already exists",
    "Out of memory",
    "Division by zero",
-   "Right parenthesis expected"
+   "No right parenthesis",
+   "No global label",
+   "No identifier",
+   "No .if command",
+   "No string",
+   "Invalid pseudo command"
 };
 
 

@@ -216,7 +216,7 @@ void make_local_symbol(char *name, unsigned int value) {
    if (last_label)
      last_local = last_label;
    else
-      error(SYNTAX_ERROR);
+      error(INVALID_LOCAL);
    if (new_symbol && symbol_name) {
       while(last_local->local)
          last_local = last_local->local;
@@ -535,7 +535,7 @@ struct token *get_token() {
       case '.':
          if ((cmd = get_pseudo_func()) != NOT_FOUND) {
             return make_token(TOKEN_PSEUDO, cmd, strdup(functions[cmd].name)); 
-         } else error(INVALID_CMD);
+         } else error(INVALID_PSEUDO);
    }
    /* identifier */
    if (isalpha(line[column])) {
@@ -585,7 +585,7 @@ int factor() {
    } else if (tok_global->id == TOKEN_LPAREN) {
       l_value = eval();
       if (tok_global->id != TOKEN_RPAREN)
-         error(RIGHT_PAREN);
+         error(INVALID_RPAREN);
       tok_global = get_token();
    } else {
       error(INVALID_EXPR);
@@ -611,7 +611,7 @@ int term() {
          r_value = factor();
          if (r_value != 0) 
             l_value = (int) (l_value / r_value);
-         else error(DIV_0);
+         else error(INVALID_DIV);
       }
    }
    return l_value;
@@ -969,7 +969,7 @@ void parse_line(void) {
          tok = get_token();
          if (tok->id == TOKEN_IDENT) {
             make_macro(tok->label);
-         } else error(SYNTAX_ERROR);
+         } else error(INVALID_IDENT);
       } else {
          functions[tok->value].func();
       }
@@ -1150,7 +1150,7 @@ void handle_else(void) {
       if (if_supress == 0)
          if_supress = 1;
       else if_supress = 0;
-   } else error(SYNTAX_ERROR);
+   } else error(INVALID_IF);
 }
 
 void handle_endif(void) {
@@ -1158,7 +1158,7 @@ void handle_endif(void) {
    if (if_seen == 1) {
       if_supress = 0;
       if_seen = 0;
-   } else error(SYNTAX_ERROR);
+   } else error(INVALID_IF);
 }
 
 void handle_endmac(void) {
@@ -1227,7 +1227,7 @@ void handle_incbin(void) {
       close_file(&file_bin);
       if (ferror(file_bin.file))
          error(READ_ERROR);
-   } else error(SYNTAX_ERROR);
+   } else error(INVALID_STRING);
 }
 
 void handle_include(void) {
@@ -1254,7 +1254,7 @@ void handle_include(void) {
       }
       close_file(file_cur);
       file_cur = file_parent;
-   } else error(SYNTAX_ERROR);
+   } else error(INVALID_STRING);
 }
 
 void handle_mac(void) {
@@ -1287,7 +1287,7 @@ void not_imp(void) {
 }
 
 void usage(void) {
-   printf("Sturm6502 macro assembler\n\n");
+   printf("Sturm6502 v0.14 macro assembler\n\n");
    printf("Usage:          sturm6502 [options] sourcefile\n\n");
    printf("-d #            debug level (1..3)\n");
    printf("-D label=value  define a numeric constant\n");
