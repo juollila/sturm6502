@@ -129,11 +129,6 @@ struct instruction {
    unsigned char op_code; /* base value */
 };
 
-struct pseudo_func {
-   char *name;
-   void (*func)(void);
-};
-
 struct file {
    FILE *file;
    char *name;
@@ -207,18 +202,76 @@ struct instruction instructions[] = {
    { "TYA", NONE, 0x98 }
 };
 
-void handle_byte(void);
-void handle_else(void);
-void handle_endif(void);
-void handle_endmac(void);
-void handle_if(void);
-void handle_ifdef(void);
-void handle_ifndef(void);
-void handle_incbin(void);
-void handle_include(void);
-void handle_mac(void);
-void handle_org(void);
-void handle_word(void);
+static void error(const unsigned char);
+void init(void); /* used by unit tests */
+static void open_file(struct file *);
+static void close_file(struct file *);
+static char *read_line(struct file *);
+static int is_delimiter(const char);
+static int is_comment(const char);
+static void skip_delimiter(void);
+#ifndef __CC65__
+static char *strupper(char *);
+#endif
+static int get_command(void);
+static int get_pseudo_func(void);
+struct symbol *find_symbol(const char *); /* used by unit tests */
+static struct symbol *find_local_symbol(const char *);
+static void make_symbol(const char *, const unsigned int);
+static void make_local_symbol(const char *, const unsigned int);
+static void free_symbols(void);
+static void print_symbols(void);
+static struct symbol *get_symbol(const unsigned int);
+static void swap_symbols(struct symbol *, struct symbol *);
+static void sort_symbols(void);
+static struct token *make_token(const unsigned int, const int, const char *);
+static void free_tokens(void);
+static char *get_string(void);
+static unsigned int get_binary_number(void);
+static unsigned int get_hex_number(void);
+static unsigned int get_dec_number(void);
+static char *get_identifier(void);
+static char *get_local_identifier(void);
+static struct token *get_token(void);
+static int factor(void);
+static int term(void);
+static int expr(void);
+static int eval1(const struct token *);
+static int eval(void);
+static void emit0(void);
+static void emit1(const unsigned char);
+static void emit2(const unsigned char, const unsigned char);
+static void emit3(const unsigned char, const unsigned char, const unsigned char);
+static char *parse_macro_param(void);
+static void parse_macro_params(struct macro *);
+static struct macro_param *get_macro_param(const struct macro *, const unsigned int);
+static void expand_macro(const struct macro *);
+static void free_macro_params(struct macro *);
+static struct macro *find_macro(const char *);
+static void make_macro(const char *);
+static void print_macros(void);
+static void free_macros(void);
+void parse_line(void); /* used by unit tests */
+static void handle_byte(void);
+static void handle_else(void);
+static void handle_endif(void);
+static void handle_endmac(void);
+static void handle_if(void);
+static void handle_ifdef(void);
+static void handle_ifndef(void);
+static void handle_incbin(void);
+static void handle_include(void);
+static void handle_mac(void);
+static void handle_org(void);
+static void handle_word(void);
+static void not_imp(void);
+static void usage(void);
+static void parse_params(int argc, char *argv[]);
+
+struct pseudo_func {
+   char *name;
+   void (*func)(void);
+};
 
 struct pseudo_func functions[] = {
    { ".BYTE", &handle_byte },
@@ -237,3 +290,4 @@ struct pseudo_func functions[] = {
 
 #define ENDMAC 3
 #define MACRO 9
+

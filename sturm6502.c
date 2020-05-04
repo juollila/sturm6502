@@ -14,32 +14,27 @@
 
 #include "sturm6502.h"
 
-
-int eval();
-struct macro *find_macro(char *);
-void parse_line(void);
-
-struct file *file_cur; /* current file */
-struct file file_asm;
-struct file file_out;
-struct file file_lst;
-struct file file_bin; /* incbin file */
+static struct file *file_cur; /* current file */
+static struct file file_asm;
+static struct file file_out;
+static struct file file_lst;
+static struct file file_bin; /* incbin file */
 
 char line[MAX_LINE_LEN];
-char cline[MAX_LINE_LEN]; /* line with preversed case */
-unsigned char column, pass;
-unsigned char opt_debug, opt_list, opt_symbol;
-unsigned char if_supress, if_seen;
+static char cline[MAX_LINE_LEN]; /* line with preversed case */
+unsigned char column, opt_debug;
+static unsigned char pass, opt_list, opt_symbol;
+static unsigned char if_supress, if_seen;
 unsigned int PC;
-struct symbol *symbols, *last_symbol, *last_label;
-struct token *tokens, *last_token, *tok_global;
-struct macro *macros, *last_macro;
+static struct symbol *symbols, *last_symbol, *last_label;
+static struct token *tokens, *last_token, *tok_global;
+static struct macro *macros, *last_macro;
 
 /* for unit tests */
 char unit_obj[3];
 unsigned char unit_asm_fails;
 
-void error(unsigned char err) {
+static void error(unsigned char err) {
    #ifdef UNIT_TEST
    unit_asm_fails += 1;
    printf("%s", error_msg[err]);
@@ -74,7 +69,7 @@ void init(void) {
    file_out.name = strdup("a.out");
 }
 
-void open_file(register struct file *file) {
+static void open_file(struct file *file) {
    file->line_number = 0;
    if ((file->file = fopen(file->name, file->mode)) == NULL) {
       // error(OPEN_ERROR);
@@ -83,11 +78,14 @@ void open_file(register struct file *file) {
    }
 }
 
-void close_file(register struct file *file) {
-   fclose(file->file);
+static void close_file(struct file *file) {
+   if (file->file) {
+      fclose(file->file);
+      file->file = NULL;
+   }
 }
 
-char *read_line(register struct file *file) {
+static char *read_line(struct file *file) {
    char *input;
    column = 0;
    file->line_number++;
@@ -97,27 +95,27 @@ char *read_line(register struct file *file) {
    return input;
 }
 
-int is_delimiter(char c) {
+static int is_delimiter(const char c) {
    unsigned char i;
    for (i = 0; i < (unsigned char) strlen(delimiter_chars); i++)
       if (c == delimiter_chars[i]) return 1;
    return 0;
 }
 
-int is_comment(char c) {
+static int is_comment(const char c) {
    unsigned char i;
    for (i = 0; i < (unsigned char) strlen(comment_chars); i++)
       if (c == comment_chars[i]) return 1;
    return 0;
 }
 
-void skip_delimiter(void) {
+static void skip_delimiter(void) {
    while (is_delimiter(line[column]))
       column++;
 }
 
 #ifndef __CC65__
-char *strupper(char *str) {
+static char *strupper(char *str) {
    char *result;
    result = str;
    while (*str != 0) {
@@ -128,7 +126,7 @@ char *strupper(char *str) {
 }
 #endif
 
-int get_command(void) {
+static int get_command(void) {
    unsigned char start = column;
    unsigned char i;
    while (isalpha(line[column]))
@@ -142,7 +140,7 @@ int get_command(void) {
    return NOT_FOUND;
 }
 
-int get_pseudo_func(void) {
+static int get_pseudo_func(void) {
    unsigned char start = column;
    unsigned char i;
    column++;
@@ -157,7 +155,7 @@ int get_pseudo_func(void) {
    return NOT_FOUND;
 }
 
-struct symbol *find_symbol(char *name) {
+struct symbol *find_symbol(const char *name) {
    struct symbol *next_symbol = symbols;
    while (next_symbol) {
       if (strcmp(name, next_symbol->name) == 0)
@@ -167,7 +165,7 @@ struct symbol *find_symbol(char *name) {
    return NULL;
 }
 
-struct symbol *find_local_symbol(char *name) {
+static struct symbol *find_local_symbol(const char *name) {
    struct symbol *next_symbol;
    if (last_label)
      next_symbol = last_label->local;
@@ -181,7 +179,7 @@ struct symbol *find_local_symbol(char *name) {
    return NULL;
 }
 
-void make_symbol(char *name, unsigned int value) {
+static void make_symbol(const char *name, const unsigned int value) {
    struct symbol *old_symbol, *new_symbol;
    char *symbol_name;
    /* if symbol already exists then update it */
@@ -202,7 +200,7 @@ void make_symbol(char *name, unsigned int value) {
    }
 }
 
-void make_local_symbol(char *name, unsigned int value) {
+static void make_local_symbol(const char *name, const unsigned int value) {
    struct symbol *old_symbol, *new_symbol, *last_local;
    char *symbol_name;
    /* if symbol already exists then update it */
@@ -228,7 +226,7 @@ void make_local_symbol(char *name, unsigned int value) {
    }
 }
 
-void free_symbols(void) {
+static void free_symbols(void) {
    struct symbol *next_symbol = symbols;
    struct symbol *current_symbol, *local_symbol;
    while (next_symbol) {
@@ -248,7 +246,7 @@ void free_symbols(void) {
    }
 }
 
-void print_symbols(void) {
+static void print_symbols(void) {
    struct symbol *symbol1, *symbol2;
    symbol1 = symbols;
    printf("*** Symbols ***\n");
@@ -264,7 +262,7 @@ void print_symbols(void) {
    }
 }
 
-struct symbol *get_symbol(unsigned int j) {
+struct symbol *get_symbol(const unsigned int j) {
    struct symbol *sym = symbols;
    unsigned int i = 0;
    while(i < j && sym) {
@@ -274,7 +272,7 @@ struct symbol *get_symbol(unsigned int j) {
    return sym;
 }
 
-void swap_symbols(struct symbol *sym1, struct symbol *sym2) {
+static void swap_symbols(struct symbol *sym1, struct symbol *sym2) {
    struct symbol tmp;
    tmp.value = sym1->value;
    tmp.name = sym1->name;
@@ -288,7 +286,7 @@ void swap_symbols(struct symbol *sym1, struct symbol *sym2) {
 };
 
 /* simple (slow) insertion sort */
-void sort_symbols(void) {
+static void sort_symbols(void) {
    unsigned int i = 1;
    unsigned int j;
    unsigned int len = 0;
@@ -310,19 +308,19 @@ void sort_symbols(void) {
 }
 
 
-struct token *make_token(unsigned int id, int value, char *label) {
+static struct token *make_token(const unsigned int id, const int value, const char *label) {
    struct token *new_tok = malloc(sizeof(struct token));
    if (new_tok) {
       if (last_token) last_token->next = new_tok; else tokens = new_tok;
       new_tok->id = id;
       new_tok->value = value;
-      new_tok->label = label;
+      new_tok->label = (char *)label;
       new_tok->next = NULL;
    }
    return new_tok;
 }
 
-void free_tokens(void) {
+static void free_tokens(void) {
    struct token *next_token = tokens;
    struct token *tok;
    while (next_token) {
@@ -335,7 +333,7 @@ void free_tokens(void) {
    last_token = NULL;
 }
 
-char *get_string() {
+static char *get_string(void) {
    char *str;
    unsigned char len = 0;
    unsigned char start;
@@ -354,7 +352,7 @@ char *get_string() {
    return str;
 }
 
-unsigned int get_binary_number() {
+static unsigned int get_binary_number(void) {
    unsigned int value = 0;
    column++;
    while (line[column] == '1' || line[column] == '0') {
@@ -365,7 +363,7 @@ unsigned int get_binary_number() {
    return value;
 }
 
-unsigned int get_hex_number() {
+static unsigned int get_hex_number(void) {
    unsigned int value = 0;
    column++;
    while (isxdigit(line[column])) {
@@ -380,7 +378,7 @@ unsigned int get_hex_number() {
    return value;
 }
 
-unsigned int get_dec_number() {
+static unsigned int get_dec_number(void) {
    unsigned int value = 0;
    while (isdigit(line[column])) {
       value *= 10;
@@ -390,7 +388,7 @@ unsigned int get_dec_number() {
    return value;
 }
 
-char *get_identifier() {
+static char *get_identifier(void) {
    char *name;
    unsigned char len = 0;
    unsigned char start = column;
@@ -409,7 +407,7 @@ char *get_identifier() {
    return name;
 }
 
-char *get_local_identifier() {
+static char *get_local_identifier(void) {
    char *name;
    unsigned char len = 0;
    unsigned char start = column;
@@ -428,7 +426,7 @@ char *get_local_identifier() {
    return name;
 }
 
-struct token *get_token() {
+static struct token *get_token(void) {
    int value, cmd;
    char *str, *label;
    struct symbol *sym;
@@ -563,7 +561,7 @@ struct token *get_token() {
    return make_token(TOKEN_UNKNOWN, 0, 0);
 }
 
-int factor() {
+static int factor(void) {
    int l_value = 0;
    if(opt_debug >= 3)
       printf("factor() tok_global->id %d\n", tok_global->id);
@@ -595,7 +593,7 @@ int factor() {
    return l_value;
 }
 
-int term() {
+static int term(void) {
    int l_value, r_value;
    if(opt_debug >= 3)
       printf("term() #1\n");
@@ -617,7 +615,7 @@ int term() {
    return l_value;
 }
 
-int expr() {
+static int expr(void) {
    int l_value;
    if(opt_debug >= 3)
       printf("expr() #1\n");
@@ -641,9 +639,9 @@ int expr() {
    return l_value;
 }
 
-int eval1(struct token *tok) {
+static int eval1(const struct token *tok) {
    int l_value;
-   tok_global = tok;
+   tok_global = (struct token *)tok;
    if (tok_global->id == TOKEN_HIGH) {
       tok_global = get_token();
       l_value = (int) (expr() / 256);
@@ -656,11 +654,11 @@ int eval1(struct token *tok) {
    return l_value;
 }
 
-int eval() {
+static int eval(void) {
    return eval1(get_token());
 }
 
-void emit0(void) {
+static void emit0(void) {
    #ifndef UNIT_TEST
    if (opt_debug >= 2)
       printf("%05d %04X          %s", file_cur->line_number, PC, &cline[0]);
@@ -670,7 +668,7 @@ void emit0(void) {
    #endif
 }
 
-void emit1(unsigned char b1) {
+static void emit1(const unsigned char b1) {
    #ifdef UNIT_TEST
    unit_obj[0]=b1;
    unit_obj[1]=0xf2;
@@ -687,7 +685,7 @@ void emit1(unsigned char b1) {
    PC = PC + 1;
 }
 
-void emit2(unsigned char b1, unsigned char b2) {
+static void emit2(const unsigned char b1, const unsigned char b2) {
    #ifdef UNIT_TEST
    unit_obj[0]=b1;
    unit_obj[1]=b2;
@@ -706,7 +704,7 @@ void emit2(unsigned char b1, unsigned char b2) {
    PC = PC + 2;
 }
 
-void emit3(unsigned char b1, unsigned char b2, unsigned char b3) {
+static void emit3(const unsigned char b1, const unsigned char b2, const unsigned char b3) {
    #ifdef UNIT_TEST
    unit_obj[0]=b1;
    unit_obj[1]=b2;
@@ -726,7 +724,7 @@ void emit3(unsigned char b1, unsigned char b2, unsigned char b3) {
    PC = PC + 3;
 }
 
-char *parse_macro_param() {
+static char *parse_macro_param(void) {
    char *param;
    unsigned char len = 0;
    unsigned char start = column;
@@ -746,7 +744,7 @@ char *parse_macro_param() {
    return param;
 }
 
-void parse_macro_params(struct macro *mac) {
+static void parse_macro_params(struct macro *mac) {
    char *str;
    struct macro_param *new_param, *last_param;
    while((str = parse_macro_param()) != 0) {
@@ -760,7 +758,7 @@ void parse_macro_params(struct macro *mac) {
    }
 }
 
-struct macro_param *get_macro_param(struct macro *mac, unsigned int j) {
+static struct macro_param *get_macro_param(const struct macro *mac, const unsigned int j) {
    struct macro_param *param;
    unsigned int i = 0;
    if (j > 9)
@@ -773,7 +771,7 @@ struct macro_param *get_macro_param(struct macro *mac, unsigned int j) {
    return param;
 }
 
-void expand_macro(struct macro *mac) {
+static void expand_macro(const struct macro *mac) {
    unsigned char c, num, src_len, i, j, k;
    struct macro_param *param;
    struct macro_line *mac_line;
@@ -806,7 +804,7 @@ void expand_macro(struct macro *mac) {
   }
 }
 
-void free_macro_params(struct macro *mac) {
+static void free_macro_params(struct macro *mac) {
    struct macro_param *next_param, *current_param;
    next_param = mac->param;
    while(next_param) {
@@ -818,7 +816,7 @@ void free_macro_params(struct macro *mac) {
    mac->param = NULL;
 }
 
-struct macro *find_macro(char *name) {
+static struct macro *find_macro(const char *name) {
    struct macro *next_macro = macros;
    while (next_macro) {
       if (strcmp(name, next_macro->name) == 0)
@@ -828,7 +826,7 @@ struct macro *find_macro(char *name) {
    return NULL;
 }
 
-void make_macro(char *name) {
+static void make_macro(const char *name) {
    struct macro *new_macro;
    char *macro_name;
    char *text;
@@ -886,7 +884,7 @@ void make_macro(char *name) {
    } else error(OUT_OF_MEMORY);
 }
 
-void print_macros(void) {
+static void print_macros(void) {
    struct macro *next_macro;
    struct macro_line *line;
    next_macro = macros;
@@ -902,7 +900,7 @@ void print_macros(void) {
    }
 }
 
-void free_macros(void) {
+static void free_macros(void) {
    struct macro *next_macro = macros;
    struct macro *current_macro;
    struct macro_line *next_line, *current_line;
@@ -1125,7 +1123,7 @@ void parse_line(void) {
       error(SYNTAX_ERROR);
 }
 
-void handle_byte(void) {
+static void handle_byte(void) {
    struct token *tok;
    unsigned char i;
    int value;
@@ -1144,7 +1142,7 @@ void handle_byte(void) {
    } while (tok->id == TOKEN_COMMA);
 }
 
-void handle_else(void) {
+static void handle_else(void) {
    emit0();
    if (if_seen == 1) {
       if (if_supress == 0)
@@ -1153,7 +1151,7 @@ void handle_else(void) {
    } else error(INVALID_IF);
 }
 
-void handle_endif(void) {
+static void handle_endif(void) {
    emit0();
    if (if_seen == 1) {
       if_supress = 0;
@@ -1161,13 +1159,13 @@ void handle_endif(void) {
    } else error(INVALID_IF);
 }
 
-void handle_endmac(void) {
+static void handle_endmac(void) {
    /* This call should not happen */
    /* make_macro handles .mac */
    error(INTERNAL_ERROR);
 }
 
-void handle_if(void) {
+static void handle_if(void) {
    int value;
    emit0();
    value = eval();
@@ -1178,7 +1176,7 @@ void handle_if(void) {
       if_supress = 0;
 }
 
-void handle_ifdef(void) {
+static void handle_ifdef(void) {
    char *label;
    struct symbol *sym = symbols;
    emit0();
@@ -1195,7 +1193,7 @@ void handle_ifdef(void) {
    if_supress = 1;
 }
 
-void handle_ifndef(void) {
+static void handle_ifndef(void) {
    char *label;
    struct symbol *sym = symbols;
    emit0();
@@ -1212,7 +1210,7 @@ void handle_ifndef(void) {
    if_supress = 0;
 }
 
-void handle_incbin(void) {
+static void handle_incbin(void) {
    struct token *tok;
    int input;
    if (if_supress == 1)
@@ -1230,7 +1228,7 @@ void handle_incbin(void) {
    } else error(INVALID_STRING);
 }
 
-void handle_include(void) {
+static void handle_include(void) {
    struct token *tok;
    struct file file_inc;
    struct file *file_parent;
@@ -1257,13 +1255,13 @@ void handle_include(void) {
    } else error(INVALID_STRING);
 }
 
-void handle_mac(void) {
+static void handle_mac(void) {
    /* This call should not happen */
    /* make_macro handles .mac */
    error(INTERNAL_ERROR);
 }
 
-void handle_org(void) {
+static void handle_org(void) {
    if (if_supress == 1)
       return;
 
@@ -1271,7 +1269,7 @@ void handle_org(void) {
    emit0();
 }
 
-void handle_word(void) {
+static void handle_word(void) {
    int value;
    if (if_supress == 1)
       return;
@@ -1282,12 +1280,12 @@ void handle_word(void) {
    } while (tok_global->id == TOKEN_COMMA);
 }
 
-void not_imp(void) {
+static void not_imp(void) {
    printf("Not implemented yet.\n");
 }
 
-void usage(void) {
-   printf("Sturm6502 v0.14 macro assembler\n\n");
+static void usage(void) {
+   printf("Sturm6502 v0.15 macro assembler\n\n");
    printf("Usage:          sturm6502 [options] sourcefile\n\n");
    printf("-d #            debug level (1..3)\n");
    printf("-D label=value  define a numeric constant\n");
@@ -1296,7 +1294,7 @@ void usage(void) {
    printf("-s              print symbols\n\n");
 }
 
-void parse_params(int argc, char *argv[]) {
+static void parse_params(int argc, char *argv[]) {
    unsigned char i = 1;
    if (argc < 2) {
       usage();
