@@ -1355,7 +1355,6 @@ static void parse_params(int argc, char *argv[]) {
 
 #ifndef UNIT_TEST
 int main(int argc, char *argv[]) {
-
    char *str;
    char name[40];
    init();
@@ -1374,43 +1373,33 @@ int main(int argc, char *argv[]) {
    file_out.name = strdup(&name[0]);
 #endif
    file_cur = &file_asm;
-   open_file(file_cur);
-   open_file(&file_out);
-   pass = 1;
-   printf("*** Pass #1 ***\n");
-   while((str = read_line(file_cur)) != 0) {
-      strcpy(&cline[0], &line[0]);
-      strupper(&line[0]);
-      column = 0;
-      parse_line();
-      free_tokens();
+   for (pass = 1; pass < 3; pass++) {
+      PC = 0;
+      last_label = NULL;
+      open_file(file_cur);
+      if (pass == 2)
+         open_file(&file_out);
+      printf("*** Pass #%d ***\n", pass);
+      if (pass == 2 && opt_debug >= 2) {
+         printf("*** Listing ***\n");
+         printf("Line# Loc  Code     Line\n");
+      }
+      if (pass == 2 && opt_list == 1) {
+         open_file(&file_lst);
+         if (fprintf(file_lst.file, "*** Listing ***\n") < 0) error(WRITE_ERROR);
+         if (fprintf(file_lst.file, "Line# Loc  Code     Line\n") < 0) error(WRITE_ERROR);
+      }
+      while((str = read_line(file_cur)) != 0) {
+         strcpy(&cline[0], &line[0]);
+         strupper(&line[0]);
+         column = 0;
+         parse_line();
+         free_tokens();
+      }
+      close_file(file_cur);
    }
-   PC = 0;
-   pass = 2;
-   last_label = NULL;
-   printf("*** Pass #2 ***\n");
-   close_file(file_cur);
-   open_file(file_cur);
-   if (pass == 2 && opt_debug >= 2) {
-      printf("*** Listing ***\n");
-      printf("Line# Loc  Code     Line\n");
-   }
-   if (pass == 2 && opt_list == 1) {
-      open_file(&file_lst);
-      if (fprintf(file_lst.file, "*** Listing ***\n") < 0) error(WRITE_ERROR);
-      if (fprintf(file_lst.file, "Line# Loc  Code     Line\n") < 0) error(WRITE_ERROR);
-   }
-   while((str = read_line(file_cur)) != 0) {
-      strcpy(&cline[0], &line[0]);
-      strupper(&line[0]);
-      column = 0;
-      parse_line();
-      free_tokens();
-   }
-   close_file(file_cur);
    close_file(&file_out);
-   if (pass == 2 && opt_list == 1)
-      close_file(&file_lst);
+   close_file(&file_lst);
    if (opt_symbol || opt_debug >=1 ) {
       sort_symbols();
       print_symbols();
