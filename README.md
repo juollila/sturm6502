@@ -10,6 +10,7 @@ support has not yet been implemented. Sturm6502 does not support 65C02 or
 COMMAND LINE PARAMETERS
 =======================
 
+```
 Usage:          sturm6502 [options] sourcefile
 
 -d #            debug level (1..3)
@@ -17,20 +18,21 @@ Usage:          sturm6502 [options] sourcefile
 -l name         generate a list file
 -o name         an object file's name
 -s              print symbols
-
+```
 LINE FORMAT
 ===========
 
 the basic format of the source file's line is the following:
-<label> <command> <operand> <command>
+```<label> <command> <operand> <command>```
 
 Examples:
+```
 label0:
 ; comment
 label1:  lda #$00    ; comment
 label2:  nop         ; comment
          clc
- 
+```
 LABELS
 ======
 
@@ -42,16 +44,19 @@ A global label starts with a letter (a-z). The following characters shall be
 alphanumberic.
 
 Examples:
+```
 Label1:
 START
-
+```
 A local label starts with a '@' character. The following characters shall be
 alphanumeric. A local label is valid only between two global labels. It can
 not be used out of the local context.
 
 Examples:
+```
 @LOCAL1:
 @skip
+```
 
 COMMENTS
 ========
@@ -60,7 +65,9 @@ A comment starts with a ';' character. A comment can be in the beginning of
 a line, after the label, or after the command and its parameter.
 
 Example:
+```
 ; This is a comment
+```
 
 PSEUDO COMMANDS
 ===============
@@ -71,14 +78,18 @@ Defines the starting address of compiled object code. This command should be
 used before any assembly code.
 
 Example:
+```
 .org $C000
+```
 
 .BYTE expression, ...
 
 This command can be used to define static bytes or reserve space.
 
 Example:
+```
 .byte "Sturmmann was here.", $0D
+```
 
 .IF expression
 
@@ -86,7 +97,9 @@ If the expression is not equal to zero then the following code is compiled.
 The nested if statements are not supported.
 
 Example:
+```
 .if 1
+```
 
 .ELSE
 
@@ -103,7 +116,9 @@ If the identifier has been defined then the following code is compiled. The
 nested ifdef statements are not supported.
 
 Example:
+```
 .ifdef foo
+```
 
 .IFNDEF identifier
 
@@ -124,10 +139,12 @@ Start a definition of the macro. In the macro definition, \1, \2, \3 ... \9
 are input arguments when macro is called.
 
 Example:
+```
 .mac lbeq
    .byte	$d0,$3   ; bne +3
    jmp   \1	
 .endmac
+```
 
 .ENDMAC
 
@@ -152,5 +169,7 @@ The logical "and" operator can be emulated using multiplication and the
 logical "or" operator can be emulated using addition.
 
 Example:
+```
 foobar = (foo + bar) * sturm  ; (foo || bar) && sturm
+```
 
