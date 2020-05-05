@@ -1,0 +1,1 @@
+CHROUT = $FFD2   .ORG  $C000-2   .WORD STARTSTART:   LDX   #0LOOP:   LDA   TEXT,X   BEQ   END   JSR   CHROUT   INX   BNE   LOOPEND   RTSTEXT:   .BYTE "хелло, ворлд!",0X0D, 0

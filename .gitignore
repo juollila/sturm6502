@@ -3,6 +3,7 @@
 *.o
 a.out
 sturm6502
+c64/c64.hex
 test/smoke/smoke.hex
 test/smoke/sturmdos.bin
 test/unit/lcut/

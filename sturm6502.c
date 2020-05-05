@@ -21,7 +21,7 @@ static struct file file_lst;
 static struct file file_bin; /* incbin file */
 
 char line[MAX_LINE_LEN];
-static char cline[MAX_LINE_LEN]; /* line with preversed case */
+char cline[MAX_LINE_LEN]; /* line with preversed case */
 unsigned char column, opt_debug;
 static unsigned char pass, opt_list, opt_symbol;
 static unsigned char if_supress, if_seen;
@@ -34,7 +34,7 @@ static struct macro *macros, *last_macro;
 char unit_obj[3];
 unsigned char unit_asm_fails;
 
-static void error(unsigned char err) {
+static void error(const unsigned char err) {
    #ifdef UNIT_TEST
    unit_asm_fails += 1;
    printf("%s", error_msg[err]);
@@ -253,10 +253,18 @@ static void print_symbols(void) {
    while (symbol1) {
       symbol2 = symbol1->global;
       if (symbol1 && symbol2) {
+#ifdef __CC65__
+         printf("%14s %04X %14s %04X\n", symbol1->name, symbol1->value, symbol2->name, symbol2->value);
+#else
          printf("%20s %04X %20s %04X\n", symbol1->name, symbol1->value, symbol2->name, symbol2->value);
+#endif
          symbol1 = symbol2->global;
       } else if (symbol1) {
+#ifdef __CC65__
+         printf("%14s %04X\n", symbol1->name, symbol1->value);
+#else
          printf("%20s %04X\n", symbol1->name, symbol1->value);
+#endif
          symbol1 = NULL;
       }
    }
@@ -316,7 +324,8 @@ static struct token *make_token(const unsigned int id, const int value, const ch
       new_tok->value = value;
       new_tok->label = (char *)label;
       new_tok->next = NULL;
-   }
+      last_token = new_tok;
+   } else error(OUT_OF_MEMORY);
    return new_tok;
 }
 
@@ -339,16 +348,16 @@ static char *get_string(void) {
    unsigned char start;
    column++;
    start=column;
-   while ((line[column] != '"') && (line[column] != 0)) {
+   while ((cline[column] != '"') && (cline[column] != 0)) {
       len++;
       column++;
    }
-   if (line[column] == '"')
+   if (cline[column] == '"')
       column++;
    str = malloc(len+1);
    str[len] = 0;
    if (str)
-      strncpy(str, &line[start], len);
+      strncpy(str, &cline[start], len);
    return str;
 }
 
@@ -457,7 +466,8 @@ static struct token *get_token(void) {
    }
    /* command */
    if ((cmd=get_command()) != NOT_FOUND) {
-      return make_token(TOKEN_CMD, cmd, strdup(instructions[cmd].mnemonic)); 
+      // return make_token(TOKEN_CMD, cmd, strdup(instructions[cmd].mnemonic)); 
+      return make_token(TOKEN_CMD, cmd, 0); 
    }
    /* a bunch of other tokens */
    switch(line[column]) {
@@ -532,7 +542,7 @@ static struct token *get_token(void) {
          return make_token(TOKEN_COMMENT, 0, 0);
       case '.':
          if ((cmd = get_pseudo_func()) != NOT_FOUND) {
-            return make_token(TOKEN_PSEUDO, cmd, strdup(functions[cmd].name)); 
+            return make_token(TOKEN_PSEUDO, cmd, 0); 
          } else error(INVALID_PSEUDO);
    }
    /* identifier */
@@ -644,10 +654,10 @@ static int eval1(const struct token *tok) {
    tok_global = (struct token *)tok;
    if (tok_global->id == TOKEN_HIGH) {
       tok_global = get_token();
-      l_value = (int) (expr() / 256);
+      l_value = ((unsigned int)expr()) / 256;
    } else if (tok_global->id == TOKEN_LOW) {
       tok_global = get_token();
-      l_value = expr() % 256;
+      l_value = ((unsigned int)expr()) % 256;
    } else {
       l_value = expr();
    }
@@ -921,10 +931,13 @@ static void free_macros(void) {
 void parse_line(void) {
    struct token *tok_prev, *tok;
    int value;
+   unsigned int uvalue;
    struct instruction inst;
    unsigned char code;
    struct macro *mac;
    tok = get_token();
+   if (opt_debug >= 3)
+      printf("parse_line token: %d\n", tok->id);
    /* empty line or comment line */
    if (tok->id == TOKEN_EOL || tok->id == TOKEN_COMMENT) {
       emit0();
@@ -1000,15 +1013,17 @@ void parse_line(void) {
          return; // new
       /* immediate mode */
       } else if (tok->id == TOKEN_HASH) {
-         value = eval();
+         uvalue = (unsigned int) eval();
+         if (uvalue > 255)
+            error(INVALID_MODE);
          if (inst.addr_modes & IMM) {
             code = inst.op_code + 8;
-            if (opt_debug >= 3) printf("immediate mode1: %x %x\n", code, value);
-            emit2(code, value%256);
+            if (opt_debug >= 3) printf("immediate mode1: %x %x\n", code, uvalue);
+            emit2(code, uvalue%256);
          } else if (inst.addr_modes & IMM2) {
             code = inst.op_code + 0;
-            if (opt_debug >= 3) printf("immediate mode2: %x %x\n", code, value);
-            emit2(code, value%256);
+            if (opt_debug >= 3) printf("immediate mode2: %x %x\n", code, uvalue);
+            emit2(code, uvalue%256);
          } else {
             error(INVALID_MODE);
          }
@@ -1026,7 +1041,7 @@ void parse_line(void) {
          emit2(code, value%256);
          tok = tok_global; // new
       } else if (tok->id == TOKEN_LPAREN) {
-         value = eval();
+         uvalue = (unsigned int)eval();
          tok = tok_global;
          /* (indirect,x) */
          if (tok->id == TOKEN_COMMA &&
@@ -1035,15 +1050,15 @@ void parse_line(void) {
              (inst.addr_modes & IND_X))
          {
             code = inst.op_code + 0;
-            if (opt_debug >= 3) printf("(indirect,x) mode: %x %x\n", code, value);
-            emit2(code, value%256);
+            if (opt_debug >= 3) printf("(indirect,x) mode: %x %x\n", code, uvalue);
+            emit2(code, uvalue%256);
          /* (absolute indirect */
          } else if (tok->id == TOKEN_RPAREN &&
                     (inst.addr_modes & ABS_IND))
          {
             code = inst.op_code + 0x2c;
-            if (opt_debug >= 3) printf("(absolute indirect) mode: %x %x %x\n", code, value%256, value/256);
-            emit3(code, value%256, value/256);
+            if (opt_debug >= 3) printf("(absolute indirect) mode: %x %x %x\n", code, uvalue%256, uvalue/256);
+            emit3(code, uvalue%256, uvalue/256);
          /* (indirect),y */
          } else if (tok->id == TOKEN_RPAREN &&
                     get_token()->id == TOKEN_COMMA &&
@@ -1051,46 +1066,46 @@ void parse_line(void) {
                     (inst.addr_modes & IND_Y))
          {
             code = inst.op_code + 0x10;
-            if (opt_debug >= 3) printf("(indirect),y mode: %x %x\n", code, value);
-            emit2(code, value%256);
+            if (opt_debug >= 3) printf("(indirect),y mode: %x %x\n", code, uvalue);
+            emit2(code, uvalue%256);
          } else {
             error(INVALID_MODE);
          }
          tok = get_token(); // new
       /* addressing mode should be zp, zp_x, zp_y, abs, abs_x, abs_y, or abs_y2 */
       } else {
-         value = eval1(tok);
+         uvalue = (unsigned int)eval1(tok);
          tok = tok_global;
          /* addressing mode should be zp_x, zp_y, abs_x, abs_y, or abs_y2 */
          if (tok->id == TOKEN_COMMA) {
             tok = get_token();
             /* addressing mode should be zp_x or abs_x */
             if (tok->id == TOKEN_X) {
-               if (value < 256 && (inst.addr_modes & ZP_X)) {
+               if (uvalue < 256 && (inst.addr_modes & ZP_X)) {
                   code = inst.op_code + 0x14;
-                  if (opt_debug >= 3) printf("zp_x mode: %x %x\n", code, value);
-                  emit2(code, value);
+                  if (opt_debug >= 3) printf("zp_x mode: %x %x\n", code, uvalue);
+                  emit2(code, uvalue);
                } else if (inst.addr_modes & ABS_X) {
                   code = inst.op_code + 0x1c;
-                  if (opt_debug >= 3) printf("abs_x mode: %x %x %x\n", code, value%256, value/256);
-                  emit3(code, value%256, value/256);
+                  if (opt_debug >= 3) printf("abs_x mode: %x %x %x\n", code, uvalue%256, uvalue/256);
+                  emit3(code, uvalue%256, uvalue/256);
                } else {
                   error(INVALID_MODE);
                }
             /* addressing mode should be zp_y, abs_y, or abs_y2 */
             } else if (tok->id == TOKEN_Y) {
-               if (value < 256 && (inst.addr_modes & ZP_Y)) {
+               if (uvalue < 256 && (inst.addr_modes & ZP_Y)) {
                   code = inst.op_code + 0x14;
-                  if (opt_debug >= 3) printf("zp_y mode: %x %x\n", code, value);
-                  emit2(code, value);
+                  if (opt_debug >= 3) printf("zp_y mode: %x %x\n", code, uvalue);
+                  emit2(code, uvalue);
                } else if (inst.addr_modes & ABS_Y) {
                   code = inst.op_code + 0x18;
-                  if (opt_debug >= 3) printf("abs_y mode: %x %x %x\n", code, value%256, value/256);
-                  emit3(code, value%256, value/256);
+                  if (opt_debug >= 3) printf("abs_y mode: %x %x %x\n", code, uvalue%256, uvalue/256);
+                  emit3(code, uvalue%256, uvalue/256);
                } else if (inst.addr_modes & ABS_Y2) {
                   code = inst.op_code + 0x1c;
-                  if (opt_debug >= 3) printf("abs_y2 mode: %x %x %x\n", code, value%256, value/256);
-                  emit3(code, value%256, value/256);
+                  if (opt_debug >= 3) printf("abs_y2 mode: %x %x %x\n", code, uvalue%256, uvalue/256);
+                  emit3(code, uvalue%256, uvalue/256);
                } else {
                   error(INVALID_MODE);
                }
@@ -1101,15 +1116,15 @@ void parse_line(void) {
          /* addressing mode should be zp or abs */
          } else {
             /* zp addressing mode */
-            if (value < 256 && (inst.addr_modes & ZP)) {
+            if (uvalue < 256 && (inst.addr_modes & ZP)) {
                code = inst.op_code + 0x4;
-               if (opt_debug >= 3) printf("zp mode: %x %x\n", code, value);
-               emit2(code, value);
+               if (opt_debug >= 3) printf("zp mode: %x %x\n", code, uvalue);
+               emit2(code, uvalue);
             /* absolute addressing mode */
             } else if (inst.addr_modes & ABS ) {
                code = inst.op_code + 0xc;
-               if (opt_debug >= 3) printf("absolute mode: %x, %x, %x\n", code, value%256, value/256);
-               emit3(code, value%256, value/256);
+               if (opt_debug >= 3) printf("absolute mode: %x, %x, %x\n", code, uvalue%256, uvalue/256);
+               emit3(code, uvalue%256, uvalue/256);
             } else {
                error(INVALID_MODE);
             }
@@ -1126,18 +1141,20 @@ void parse_line(void) {
 static void handle_byte(void) {
    struct token *tok;
    unsigned char i;
-   int value;
+   unsigned int uvalue;
    do {
       tok = get_token();
+      if (opt_debug >= 3)
+         printf("handle_byte token: %d\n", tok->id);
       if (tok->id == TOKEN_STRING) {
          for (i = 0; i < strlen(tok->label); i++) {
             emit1(tok->label[i]);
          }
          tok = get_token();
       } else {
-         value = eval1(tok);
+         uvalue = (unsigned int)eval1(tok);
          tok = tok_global;
-         emit1(value%256);
+         emit1(uvalue%256);
       }
    } while (tok->id == TOKEN_COMMA);
 }
@@ -1265,27 +1282,25 @@ static void handle_org(void) {
    if (if_supress == 1)
       return;
 
-   PC = eval();
+   PC = (unsigned int)eval();
    emit0();
 }
 
 static void handle_word(void) {
-   int value;
+   unsigned int uvalue;
    if (if_supress == 1)
       return;
 
    do {
-      value = eval();
-      emit2(value%256, value/256); 
+      uvalue = (unsigned int)eval();
+      emit2(uvalue%256, uvalue/256); 
    } while (tok_global->id == TOKEN_COMMA);
 }
 
-static void not_imp(void) {
-   printf("Not implemented yet.\n");
-}
-
+#ifndef __CC65__
 static void usage(void) {
-   printf("Sturm6502 v0.15 macro assembler\n\n");
+   printf("Sturm6502 v0.16 macro assembler\n");
+   printf("Coded by Juha Ollila\n\n");
    printf("Usage:          sturm6502 [options] sourcefile\n\n");
    printf("-d #            debug level (1..3)\n");
    printf("-D label=value  define a numeric constant\n");
@@ -1336,13 +1351,28 @@ static void parse_params(int argc, char *argv[]) {
       print_symbols();
    }
 }
+#endif
 
 #ifndef UNIT_TEST
 int main(int argc, char *argv[]) {
 
    char *str;
+   char name[40];
    init();
+#ifndef __CC65__
    parse_params(argc, argv);
+#endif
+#ifdef __CC65__
+   opt_debug = 1;
+   printf("Sturm6502 macro assembler\n\n");
+   printf("Source file: ");
+   gets(&name[0]);
+   file_asm.name = strdup(&name[0]);
+   printf("\nOutput file: ");
+   gets(&name[0]);
+   printf("\n");
+   file_out.name = strdup(&name[0]);
+#endif
    file_cur = &file_asm;
    open_file(file_cur);
    open_file(&file_out);

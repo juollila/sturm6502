@@ -44,11 +44,11 @@ enum {
    TOKEN_IDENT,
    TOKEN_STRING,
    TOKEN_DOT,
-   TOKEN_PSEUDO,
+   TOKEN_PSEUDO, // 21
    TOKEN_CHAR,
    TOKEN_PARAM,
    TOKEN_LOCAL,
-   TOKEN_UNKNOWN
+   TOKEN_UNKNOWN // 25
 };
 /* error messages */
 enum {
@@ -119,7 +119,7 @@ struct token {
    unsigned int id;
    int value;
    char *label;
-   struct macro *mac;
+   // struct macro *mac;
    struct token *next;
 };
 
@@ -264,9 +264,10 @@ static void handle_include(void);
 static void handle_mac(void);
 static void handle_org(void);
 static void handle_word(void);
-static void not_imp(void);
+#ifndef __CC65__
 static void usage(void);
 static void parse_params(int argc, char *argv[]);
+#endif
 
 struct pseudo_func {
    char *name;

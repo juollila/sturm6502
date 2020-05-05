@@ -3,13 +3,16 @@
 extern void parse_line(void);
 extern void init(void);
 extern char line[];
+extern char cline[];
 extern unsigned char unit_obj[];
 extern unsigned char column;
 extern unsigned int PC;
+extern unsigned char opt_debug;
 
 void tc_byte1(lcut_tc_t *tc, void *data) {
    init();
    strcpy(&line[0], ".BYTE \"STURM6502\"\n");
+   strcpy(&cline[0], ".BYTE \"STURM6502\"\n");
    parse_line();
    LCUT_INT_EQUAL(tc, '2', unit_obj[0]);
    LCUT_INT_EQUAL(tc, 0x09, PC);

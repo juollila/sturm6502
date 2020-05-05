@@ -24,7 +24,41 @@
 ; @"CD <-"			Change to the above directory (sd2iec) (*)
 ;
 ;				(*) = <- means left arrow
-	.include	"test/smoke/define.asm"
+
+; kernal routines
+chkin	=	$ffc6
+chkout	=	$ffc9
+chrin	=	$ffcf
+chrout	=	$ffd2
+close	=	$ffc3
+clrchn	=	$ffcc
+load	=	$ffd5
+open	=	$ffc0
+readst	=	$ffb7
+setlfs	=	$ffba
+setnam	=	$ffbd
+
+basic	=	$2b
+variables =	$2d
+chrget	=	$73
+textptr	=	$7a
+endofload =	$ae
+devnbr	=	$ba
+ndx	=	$c6	; number of chars in keyboard buffer
+buffer	=	$200
+keybuffer =	$277
+warm	=	$302
+igone	=	$308
+goneptr	=	$3fc
+saveptr	=	$3fe
+tape	=	$33c	; tape buffer
+device	=	tape
+secondary =	tape+1
+run	=	tape+2
+length	=	tape+3
+bin	=	tape+4
+bcd	=	tape+6
+param	=	tape+9
 
 ; macros
 
@@ -103,7 +137,7 @@ atcommand
 	lda	length
 	lbeq	readError
 	lda	param
-	cmp	#"Q"
+	cmp	#"q"
 	beq	quit
 	cmp	#"$"
 	lbeq	readDir
@@ -510,7 +544,7 @@ binBCD16
 
 	rts		; All Done.
 
-title	.byte	"STURMDOS V1.0 INSTALLED",13,0
-runtext	.byte	"RUN",13,0	; run command
-readytext .byte	13,"READY.",13,0
+title	.byte	"sturmdos v1.0 installed",13,0
+runtext	.byte	"run",13,0	; run command
+readytext .byte	13,"ready.",13,0
 dirname	.byte	"$"
