@@ -206,6 +206,7 @@ static void error(const unsigned char);
 void init(void); /* used by unit tests */
 static void open_file(struct file *);
 static void close_file(struct file *);
+static void free_file_names(void);
 static char *read_line(struct file *);
 static int is_delimiter(const char);
 static int is_comment(const char);

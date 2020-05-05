@@ -29,7 +29,8 @@ unsigned int PC;
 static struct symbol *symbols, *last_symbol, *last_label;
 static struct token *tokens, *last_token, *tok_global;
 static struct macro *macros, *last_macro;
-
+static char *read_mode = "r";
+static char *write_mode = "w";
 /* for unit tests */
 char unit_obj[3];
 unsigned char unit_asm_fails;
@@ -61,11 +62,13 @@ void init(void) {
    opt_symbol = 0;
    if_supress = 0;
    if_seen = 0;
-   file_asm.mode = strdup("r");
-   file_lst.mode = strdup("w");
-   file_lst.name = strdup("a.lst");
-   file_bin.mode = strdup("r");
-   file_out.mode = strdup("w");
+   file_asm.mode = read_mode;
+   file_asm.name = NULL;
+   file_lst.mode = write_mode;
+   file_lst.name = NULL;
+   file_bin.mode = read_mode;
+   file_bin.name = NULL;
+   file_out.mode = write_mode;
    file_out.name = strdup("a.out");
 }
 
@@ -83,6 +86,15 @@ static void close_file(struct file *file) {
       fclose(file->file);
       file->file = NULL;
    }
+}
+
+static void free_file_names(void) {
+   if (file_asm.name)
+      free(file_asm.name);
+   if (file_lst.name)
+      free(file_lst.name);
+   if (file_out.name)
+      free(file_out.name);
 }
 
 static char *read_line(struct file *file) {
@@ -1299,7 +1311,7 @@ static void handle_word(void) {
 
 #ifndef __CC65__
 static void usage(void) {
-   printf("Sturm6502 v0.16 macro assembler\n");
+   printf("Sturm6502 v0.22 macro assembler\n");
    printf("Coded by Juha Ollila\n\n");
    printf("Usage:          sturm6502 [options] sourcefile\n\n");
    printf("-d #            debug level (1..3)\n");
@@ -1315,7 +1327,7 @@ static void parse_params(int argc, char *argv[]) {
       usage();
       exit(1);
    }
-   file_asm.name = argv[argc-1]; // 2
+   file_asm.name = strdup(argv[argc-1]); // 2
    while (i < argc - 1) { // i = 1
       if (strncmp("-d", argv[i], 2) == 0 && (i < argc - 2)) {
          opt_debug = argv[i+1][0] - '0';
@@ -1326,10 +1338,11 @@ static void parse_params(int argc, char *argv[]) {
          i += 2;
       } else if (strncmp("-l", argv[i], 2) == 0 && i < (argc -2 )) {
          opt_list = 1;
-         file_lst.name = argv[i+1];
+         file_lst.name = strdup(argv[i+1]);
          i += 2;
       } else if (strncmp("-o", argv[i], 2) == 0 && i < (argc -2 )) {
-         file_out.name = argv[i+1];
+         free(file_out.name);
+         file_out.name = strdup(argv[i+1]);
          i += 2;
       } else if (strncmp("-s", argv[i], 2) == 0) {
       printf("s");
@@ -1362,6 +1375,7 @@ void cc65_params(void) {
    printf("\nOutput file: ");
    gets(&name[0]);
    printf("\n");
+   free(file_out.name);
    file_out.name = strdup(&name[0]);
 }
 #endif
@@ -1411,6 +1425,7 @@ int main(int argc, char *argv[]) {
       print_macros();
    free_macros();
    free_symbols();
+   free_file_names();
    return 0;
 }
 #endif
