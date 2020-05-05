@@ -23,7 +23,9 @@ LINE FORMAT
 ===========
 
 the basic format of the source file's line is the following:
-```<label> <command> <operand> <command>```
+```
+<label> <command> <operand> <comment>
+```
 
 Examples:
 ```
@@ -72,7 +74,7 @@ Example:
 PSEUDO COMMANDS
 ===============
 
-.ORG expression
+###.ORG expression
 
 Defines the starting address of compiled object code. This command should be
 used before any assembly code.
@@ -82,7 +84,7 @@ Example:
 .org $C000
 ```
 
-.BYTE expression, ...
+###.BYTE expression, ...
 
 This command can be used to define static bytes or reserve space.
 
@@ -91,7 +93,7 @@ Example:
 .byte "Sturmmann was here.", $0D
 ```
 
-.IF expression
+###.IF expression
 
 If the expression is not equal to zero then the following code is compiled.
 The nested if statements are not supported.
@@ -101,16 +103,16 @@ Example:
 .if 1
 ```
 
-.ELSE
+###.ELSE
 
 If the .IF statement's expression was equal to zero then the code after the
 .ELSE is compiled.
 
-.ENDIF
+###.ENDIF
 
 Terminates the previous .IF.
 
-.IFDEF identifier
+###.IFDEF identifier
 
 If the identifier has been defined then the following code is compiled. The
 nested ifdef statements are not supported.
@@ -120,20 +122,20 @@ Example:
 .ifdef foo
 ```
 
-.IFNDEF identifier
+###.IFNDEF identifier
 
 If the identifier has not been defined then the following code is compiled.
 The nested ifndef statements are not supported.
 
-.INCLUDE "file"
+###.INCLUDE "file"
 
 The included "file" is compiled. The nested includes are supported.
 
-.INCBIN "file"
+###.INCBIN "file"
 
 The included "file" is copied directly (as a binary) to the object file. 
 
-.MAC name
+###.MAC name
 
 Start a definition of the macro. In the macro definition, \1, \2, \3 ... \9
 are input arguments when macro is called.
@@ -146,7 +148,7 @@ Example:
 .endmac
 ```
 
-.ENDMAC
+###.ENDMAC
 
 Terminates a macro definition.
  
