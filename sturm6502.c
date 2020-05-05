@@ -1351,17 +1351,9 @@ static void parse_params(int argc, char *argv[]) {
       print_symbols();
    }
 }
-#endif
-
-#ifndef UNIT_TEST
-int main(int argc, char *argv[]) {
-   char *str;
+#else
+void cc65_params(void) {
    char name[40];
-   init();
-#ifndef __CC65__
-   parse_params(argc, argv);
-#endif
-#ifdef __CC65__
    opt_debug = 1;
    printf("Sturm6502 macro assembler\n\n");
    printf("Source file: ");
@@ -1371,6 +1363,17 @@ int main(int argc, char *argv[]) {
    gets(&name[0]);
    printf("\n");
    file_out.name = strdup(&name[0]);
+}
+#endif
+
+#ifndef UNIT_TEST
+int main(int argc, char *argv[]) {
+   char *str;
+   init();
+#ifndef __CC65__
+   parse_params(argc, argv);
+#else
+   cc65_params();
 #endif
    file_cur = &file_asm;
    for (pass = 1; pass < 3; pass++) {
