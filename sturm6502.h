@@ -293,3 +293,6 @@ struct pseudo_func functions[] = {
 #define ENDMAC 3
 #define MACRO 9
 
+static char *read_mode = "r";
+static char *write_mode = "w";
+

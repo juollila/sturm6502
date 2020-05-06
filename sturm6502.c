@@ -29,8 +29,6 @@ unsigned int PC;
 static struct symbol *symbols, *last_symbol, *last_label;
 static struct token *tokens, *last_token, *tok_global;
 static struct macro *macros, *last_macro;
-static char *read_mode = "r";
-static char *write_mode = "w";
 /* for unit tests */
 char unit_obj[3];
 unsigned char unit_asm_fails;
@@ -143,7 +141,7 @@ static int get_command(void) {
    unsigned char i;
    while (isalpha(line[column]))
       column++;
-   for (i = 0; i < (sizeof(instructions) / sizeof(struct instruction)); i++) {
+   for (i = 0; i < 56; i++) {
       if (strncmp(&line[start], instructions[i].mnemonic, 3) == 0 && !isalnum(line[start+3])) {
          return i;
       }
@@ -569,6 +567,7 @@ static struct token *get_token(void) {
       /* 32767 is dummy value for the forward reference */
       if (pass == 1)
          return make_token(TOKEN_IDENT, 32767, label);
+      free(label);
    }
    /* local identifier */
    if (line[column] == '@') {
@@ -579,6 +578,7 @@ static struct token *get_token(void) {
       /* forward reference */
       if (pass == 1)
          return make_token(TOKEN_LOCAL, 32767, label);
+      free(label);
    }
    return make_token(TOKEN_UNKNOWN, 0, 0);
 }
@@ -783,7 +783,7 @@ static void parse_macro_params(struct macro *mac) {
 static struct macro_param *get_macro_param(const struct macro *mac, const unsigned int j) {
    struct macro_param *param;
    unsigned int i = 0;
-   if (j > 9)
+   if ((j < 0) || (j > 9))
       return NULL;
    param = mac->param;
    while(i < j && param) {
@@ -934,6 +934,7 @@ static void free_macros(void) {
          next_line = next_line->next;
          free(current_line);
       }
+      free(next_macro->name);
       current_macro = next_macro;
       next_macro = next_macro->next;
       free(current_macro);
@@ -1215,11 +1216,13 @@ static void handle_ifdef(void) {
    while (sym) {
       if (strcmp(sym->name, label)==0) {
          if_supress = 0;
+         free(label);
          return;
       }
       sym = sym->global;
    }
    if_supress = 1;
+   free(label);
 }
 
 static void handle_ifndef(void) {
@@ -1232,11 +1235,13 @@ static void handle_ifndef(void) {
    while (sym) {
       if (strcmp(sym->name, label)==0) {
          if_supress = 1;
+         free(label);
          return;
       }
       sym = sym->global;
    }
    if_supress = 0;
+   free(label);
 }
 
 static void handle_incbin(void) {
@@ -1270,7 +1275,7 @@ static void handle_include(void) {
       file_parent = file_cur;
       file_cur = &file_inc;
       file_cur->name = tok->label;
-      file_cur->mode = "r";
+      file_cur->mode = read_mode;
       open_file(file_cur);
       while(read_line(file_cur) != 0) {
          strcpy(&cline[0], &line[0]);
