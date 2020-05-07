@@ -136,18 +136,21 @@ static char *strupper(char *str) {
 }
 #endif
 
-static int get_command(void) {
-   unsigned char start = column;
-   unsigned char i;
-   while (isalpha(line[column]))
-      column++;
-   for (i = 0; i < 56; i++) {
-      if (strncmp(&line[start], instructions[i].mnemonic, 3) == 0 && !isalnum(line[start+3])) {
-         return i;
+struct instruction *get_command(void) {
+   char c;
+   struct instruction *inst;
+   c = line[column] - 'A';
+   if (c<0 || c>19 || isalnum(line[column+3]))
+      return NULL;
+   inst = instructions[c];
+   while (*inst->mnemonic != 0) {
+      if (strncmp(&line[column], inst->mnemonic, 3) == 0) {
+         column += 3;
+         return inst;
       }
+      inst++;
    }
-   column = start;
-   return NOT_FOUND;
+   return NULL;
 }
 
 static int get_pseudo_func(void) {
@@ -326,13 +329,14 @@ static void sort_symbols(void) {
 }
 
 
-static struct token *make_token(const unsigned int id, const int value, const char *label) {
+static struct token *make_token(const unsigned int id, const int value, const char *label, const struct instruction *inst) {
    struct token *new_tok = malloc(sizeof(struct token));
    if (new_tok) {
       if (last_token) last_token->next = new_tok; else tokens = new_tok;
       new_tok->id = id;
       new_tok->value = value;
       new_tok->label = (char *)label;
+      new_tok->inst = (struct instruction *)inst;
       new_tok->next = NULL;
       last_token = new_tok;
    } else error(OUT_OF_MEMORY);
@@ -446,113 +450,114 @@ static char *get_local_identifier(void) {
 }
 
 static struct token *get_token(void) {
-   int value, cmd;
+   int value, pseudo;
+   struct instruction *cmd;
    char *str, *label;
    struct symbol *sym;
    struct macro *mac;
    /* comment */
    if (column == 0) {
       if(is_comment(line[column]))
-         return make_token(TOKEN_COMMENT, 0, 0);
+         return make_token(TOKEN_COMMENT, 0, 0, 0);
    }
    skip_delimiter();
    /* string */
    if (line[column] == '"') {
       str = get_string();
-      return make_token(TOKEN_STRING, 0, str);
+      return make_token(TOKEN_STRING, 0, str, 0);
    }
    /* number */
    if (line[column] == '%') {
       value = get_binary_number();
-      return make_token(TOKEN_NUMBER, value, 0);
+      return make_token(TOKEN_NUMBER, value, 0, 0);
    }
    if (line[column] == '$') {
       value = get_hex_number();
-      return make_token(TOKEN_NUMBER, value, 0);
+      return make_token(TOKEN_NUMBER, value, 0, 0);
    }
    if (isdigit(line[column])) {
       value = get_dec_number();
-      return make_token(TOKEN_NUMBER, value, 0);
+      return make_token(TOKEN_NUMBER, value, 0, 0);
    }
    /* command */
-   if ((cmd=get_command()) != NOT_FOUND) {
+   if ((cmd=get_command()) != NULL) {
       // return make_token(TOKEN_CMD, cmd, strdup(instructions[cmd].mnemonic)); 
-      return make_token(TOKEN_CMD, cmd, 0); 
+      return make_token(TOKEN_CMD, 0, 0, cmd); 
    }
    /* a bunch of other tokens */
    switch(line[column]) {
       case 'A':
          if(!isalnum(line[column+1])) {
             column++;
-            return make_token(TOKEN_A, 0, 0);
+            return make_token(TOKEN_A, 0, 0, 0);
          }
          break;
       case 'X':
          if(!isalnum(line[column+1])) {
             column++;
-            return make_token(TOKEN_X, 0, 0);
+            return make_token(TOKEN_X, 0, 0, 0);
          }
          break;
       case 'Y':
          if(!isalnum(line[column+1])) {
             column++;
-            return make_token(TOKEN_Y, 0, 0);
+            return make_token(TOKEN_Y, 0, 0, 0);
          }
          break;
       case '\'': 
          if(isprint(line[column+1])) {
             value = line[column+1];
             if (line[column+2] == '\'') column += 3; else column += 2;
-            return make_token(TOKEN_CHAR, value, 0);
+            return make_token(TOKEN_CHAR, value, 0, 0);
          }
          break;
       case 0:
-         return make_token(TOKEN_EOL, 0, 0);
+         return make_token(TOKEN_EOL, 0, 0, 0);
       case '\n':
          column++;
-         return make_token(TOKEN_EOL, 0, 0);
+         return make_token(TOKEN_EOL, 0, 0, 0);
       case '\r':
          column++;
-         return make_token(TOKEN_EOL, 0, 0);
+         return make_token(TOKEN_EOL, 0, 0, 0);
       case '#':
          column++;
-         return make_token(TOKEN_HASH, 0, 0);
+         return make_token(TOKEN_HASH, 0, 0, 0);
       case ',':
          column++;
-         return make_token(TOKEN_COMMA, 0, 0);
+         return make_token(TOKEN_COMMA, 0, 0, 0);
       case '(':
          column++;
-         return make_token(TOKEN_LPAREN, 0, 0);
+         return make_token(TOKEN_LPAREN, 0, 0, 0);
       case ')':
          column++;
-         return make_token(TOKEN_RPAREN, 0, 0);
+         return make_token(TOKEN_RPAREN, 0, 0, 0);
       case '*':
          column++;
-         return make_token(TOKEN_MUL, 0, 0);
+         return make_token(TOKEN_MUL, 0, 0, 0);
       case '<':
          column++;
-         return make_token(TOKEN_LOW, 0, 0);
+         return make_token(TOKEN_LOW, 0, 0, 0);
       case '>':
          column++;
-         return make_token(TOKEN_HIGH, 0, 0);
+         return make_token(TOKEN_HIGH, 0, 0, 0);
       case '+':
          column++;
-         return make_token(TOKEN_PLUS, 0, 0);
+         return make_token(TOKEN_PLUS, 0, 0, 0);
       case '-':
          column++;
-         return make_token(TOKEN_MINUS, 0, 0);
+         return make_token(TOKEN_MINUS, 0, 0, 0);
       case '/':
          column++;
-         return make_token(TOKEN_DIV, 0, 0);
+         return make_token(TOKEN_DIV, 0, 0, 0);
       case '=':
          column++;
-         return make_token(TOKEN_EQU, 0, 0);
+         return make_token(TOKEN_EQU, 0, 0, 0);
       case ';':
          column++;
-         return make_token(TOKEN_COMMENT, 0, 0);
+         return make_token(TOKEN_COMMENT, 0, 0, 0);
       case '.':
-         if ((cmd = get_pseudo_func()) != NOT_FOUND) {
-            return make_token(TOKEN_PSEUDO, cmd, 0); 
+         if ((pseudo = get_pseudo_func()) != NOT_FOUND) {
+            return make_token(TOKEN_PSEUDO, pseudo, 0, 0); 
          } else error(INVALID_PSEUDO);
    }
    /* identifier */
@@ -560,13 +565,13 @@ static struct token *get_token(void) {
       label = get_identifier();
       mac = find_macro(label);
       if (mac)
-         return make_token(TOKEN_IDENT, 0, label);
+         return make_token(TOKEN_IDENT, 0, label, 0);
       sym = find_symbol(label);
       if (sym)
-         return make_token(TOKEN_IDENT, sym->value, label);
+         return make_token(TOKEN_IDENT, sym->value, label, 0);
       /* 32767 is dummy value for the forward reference */
       if (pass == 1)
-         return make_token(TOKEN_IDENT, 32767, label);
+         return make_token(TOKEN_IDENT, 32767, label, 0);
       free(label);
    }
    /* local identifier */
@@ -574,13 +579,13 @@ static struct token *get_token(void) {
       label = get_local_identifier();
       sym = find_local_symbol(label);
       if (sym)
-         return make_token(TOKEN_LOCAL, sym->value, label);
+         return make_token(TOKEN_LOCAL, sym->value, label, 0);
       /* forward reference */
       if (pass == 1)
-         return make_token(TOKEN_LOCAL, 32767, label);
+         return make_token(TOKEN_LOCAL, 32767, label, 0);
       free(label);
    }
-   return make_token(TOKEN_UNKNOWN, 0, 0);
+   return make_token(TOKEN_UNKNOWN, 0, 0, 0);
 }
 
 static int factor(void) {
@@ -945,7 +950,7 @@ void parse_line(void) {
    struct token *tok_prev, *tok;
    int value;
    unsigned int uvalue;
-   struct instruction inst;
+   struct instruction *inst;
    unsigned char code;
    struct macro *mac;
    tok = get_token();
@@ -1004,20 +1009,20 @@ void parse_line(void) {
       return;
    /* mnemonic */
    if (tok->id == TOKEN_CMD) {
-      inst = instructions[tok->value];
+      inst = tok->inst;
       tok = get_token();
       if (tok->id == TOKEN_EOL ||
           tok->id == TOKEN_COMMENT ||
           tok->id == TOKEN_A)
       {
          /* implied mode */
-         if (inst.addr_modes & NONE) {
-            code = inst.op_code;
+         if (inst->addr_modes & NONE) {
+            code = inst->op_code;
             if (opt_debug >= 3) printf("implied mode: %x\n", code);
             emit1(code);
          /* accumulator mode */
-         } else if (inst.addr_modes & ACC) {
-            code = inst.op_code + 8;
+         } else if (inst->addr_modes & ACC) {
+            code = inst->op_code + 8;
             if (opt_debug >= 3) printf("accumulator mode: %x\n", code);
             emit1(code);
          } else {
@@ -1029,12 +1034,12 @@ void parse_line(void) {
          uvalue = (unsigned int) eval();
          if (uvalue > 255)
             error(INVALID_MODE);
-         if (inst.addr_modes & IMM) {
-            code = inst.op_code + 8;
+         if (inst->addr_modes & IMM) {
+            code = inst->op_code + 8;
             if (opt_debug >= 3) printf("immediate mode1: %x %x\n", code, uvalue);
             emit2(code, uvalue%256);
-         } else if (inst.addr_modes & IMM2) {
-            code = inst.op_code + 0;
+         } else if (inst->addr_modes & IMM2) {
+            code = inst->op_code + 0;
             if (opt_debug >= 3) printf("immediate mode2: %x %x\n", code, uvalue);
             emit2(code, uvalue%256);
          } else {
@@ -1042,8 +1047,8 @@ void parse_line(void) {
          }
          tok = tok_global; // new
       /* relative mode */
-      } else if (inst.addr_modes & REL) {
-         code = inst.op_code + 0;
+      } else if (inst->addr_modes & REL) {
+         code = inst->op_code + 0;
          value = eval1(tok);
          value = value - PC - 2;
          if (pass == 2 && (value < -128 || value > 127))
@@ -1060,25 +1065,25 @@ void parse_line(void) {
          if (tok->id == TOKEN_COMMA &&
              get_token()->id == TOKEN_X &&
              get_token()->id == TOKEN_RPAREN &&
-             (inst.addr_modes & IND_X))
+             (inst->addr_modes & IND_X))
          {
-            code = inst.op_code + 0;
+            code = inst->op_code + 0;
             if (opt_debug >= 3) printf("(indirect,x) mode: %x %x\n", code, uvalue);
             emit2(code, uvalue%256);
          /* (absolute indirect */
          } else if (tok->id == TOKEN_RPAREN &&
-                    (inst.addr_modes & ABS_IND))
+                    (inst->addr_modes & ABS_IND))
          {
-            code = inst.op_code + 0x2c;
+            code = inst->op_code + 0x2c;
             if (opt_debug >= 3) printf("(absolute indirect) mode: %x %x %x\n", code, uvalue%256, uvalue/256);
             emit3(code, uvalue%256, uvalue/256);
          /* (indirect),y */
          } else if (tok->id == TOKEN_RPAREN &&
                     get_token()->id == TOKEN_COMMA &&
                     get_token()->id == TOKEN_Y &&
-                    (inst.addr_modes & IND_Y))
+                    (inst->addr_modes & IND_Y))
          {
-            code = inst.op_code + 0x10;
+            code = inst->op_code + 0x10;
             if (opt_debug >= 3) printf("(indirect),y mode: %x %x\n", code, uvalue);
             emit2(code, uvalue%256);
          } else {
@@ -1094,12 +1099,12 @@ void parse_line(void) {
             tok = get_token();
             /* addressing mode should be zp_x or abs_x */
             if (tok->id == TOKEN_X) {
-               if (uvalue < 256 && (inst.addr_modes & ZP_X)) {
-                  code = inst.op_code + 0x14;
+               if (uvalue < 256 && (inst->addr_modes & ZP_X)) {
+                  code = inst->op_code + 0x14;
                   if (opt_debug >= 3) printf("zp_x mode: %x %x\n", code, uvalue);
                   emit2(code, uvalue);
-               } else if (inst.addr_modes & ABS_X) {
-                  code = inst.op_code + 0x1c;
+               } else if (inst->addr_modes & ABS_X) {
+                  code = inst->op_code + 0x1c;
                   if (opt_debug >= 3) printf("abs_x mode: %x %x %x\n", code, uvalue%256, uvalue/256);
                   emit3(code, uvalue%256, uvalue/256);
                } else {
@@ -1107,16 +1112,16 @@ void parse_line(void) {
                }
             /* addressing mode should be zp_y, abs_y, or abs_y2 */
             } else if (tok->id == TOKEN_Y) {
-               if (uvalue < 256 && (inst.addr_modes & ZP_Y)) {
-                  code = inst.op_code + 0x14;
+               if (uvalue < 256 && (inst->addr_modes & ZP_Y)) {
+                  code = inst->op_code + 0x14;
                   if (opt_debug >= 3) printf("zp_y mode: %x %x\n", code, uvalue);
                   emit2(code, uvalue);
-               } else if (inst.addr_modes & ABS_Y) {
-                  code = inst.op_code + 0x18;
+               } else if (inst->addr_modes & ABS_Y) {
+                  code = inst->op_code + 0x18;
                   if (opt_debug >= 3) printf("abs_y mode: %x %x %x\n", code, uvalue%256, uvalue/256);
                   emit3(code, uvalue%256, uvalue/256);
-               } else if (inst.addr_modes & ABS_Y2) {
-                  code = inst.op_code + 0x1c;
+               } else if (inst->addr_modes & ABS_Y2) {
+                  code = inst->op_code + 0x1c;
                   if (opt_debug >= 3) printf("abs_y2 mode: %x %x %x\n", code, uvalue%256, uvalue/256);
                   emit3(code, uvalue%256, uvalue/256);
                } else {
@@ -1129,13 +1134,13 @@ void parse_line(void) {
          /* addressing mode should be zp or abs */
          } else {
             /* zp addressing mode */
-            if (uvalue < 256 && (inst.addr_modes & ZP)) {
-               code = inst.op_code + 0x4;
+            if (uvalue < 256 && (inst->addr_modes & ZP)) {
+               code = inst->op_code + 0x4;
                if (opt_debug >= 3) printf("zp mode: %x %x\n", code, uvalue);
                emit2(code, uvalue);
             /* absolute addressing mode */
-            } else if (inst.addr_modes & ABS ) {
-               code = inst.op_code + 0xc;
+            } else if (inst->addr_modes & ABS ) {
+               code = inst->op_code + 0xc;
                if (opt_debug >= 3) printf("absolute mode: %x, %x, %x\n", code, uvalue%256, uvalue/256);
                emit3(code, uvalue%256, uvalue/256);
             } else {
@@ -1423,7 +1428,9 @@ int main(int argc, char *argv[]) {
    close_file(&file_out);
    close_file(&file_lst);
    if (opt_symbol || opt_debug >=1 ) {
+#ifndef __CC65__
       sort_symbols();
+#endif
       print_symbols();
    }
    if(opt_debug >= 1)

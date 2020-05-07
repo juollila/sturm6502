@@ -115,18 +115,19 @@ struct macro {
    struct macro *next;
 };
 
-struct token {
-   unsigned int id;
-   int value;
-   char *label;
-   // struct macro *mac;
-   struct token *next;
-};
-
 struct instruction {
    char *mnemonic;
    unsigned int addr_modes;
    unsigned char op_code; /* base value */
+};
+
+struct token {
+   unsigned int id;
+   int value;
+   char *label;
+   struct instruction *inst;
+   // struct macro *mac;
+   struct token *next;
 };
 
 struct file {
@@ -143,10 +144,14 @@ struct symbol {
    struct symbol *local; /* local next symbol */
 };
 
-struct instruction instructions[] = {
+struct instruction inst_a[] = {
    { "ADC", IMM|ZP|ZP_X|ABS|ABS_X|ABS_Y|IND_X|IND_Y, 0x61 },
    { "AND", IMM|ZP|ZP_X|ABS|ABS_X|ABS_Y|IND_X|IND_Y, 0x21 },
    { "ASL", ACC|ZP|ZP_X|ABS|ABS_X, 0x02 },
+   { "", 0, 0}
+};
+
+struct instruction inst_b[] = {
    { "BCC", REL, 0x90 },
    { "BCS", REL, 0xb0 },
    { "BEQ", REL, 0xf0 },
@@ -157,6 +162,10 @@ struct instruction instructions[] = {
    { "BRK", NONE, 0x00 },
    { "BVC", REL, 0x50 },
    { "BVS", REL, 0x70 },
+   { "", 0, 0}
+};
+
+struct instruction inst_c[] = {
    { "CLC", NONE, 0x18 },
    { "CLD", NONE, 0xd8 },
    { "CLI", NONE, 0x58 },
@@ -164,29 +173,93 @@ struct instruction instructions[] = {
    { "CMP", IMM|ZP|ZP_X|ABS|ABS_X|ABS_Y|IND_X|IND_Y, 0xc1 },
    { "CPX", IMM2|ZP|ABS, 0xe0 },
    { "CPY", IMM2|ZP|ABS, 0xc0 },
+   { "", 0, 0}
+};
+
+struct instruction inst_d[] = {
    { "DEC", ZP|ZP_X|ABS|ABS_X, 0xc2 },
    { "DEX", NONE, 0xca },
    { "DEY", NONE, 0x88 },
+   { "", 0, 0}
+};
+
+struct instruction inst_e[] = {
    { "EOR", IMM|ZP|ZP_X|ABS|ABS_X|ABS_Y|IND_X|IND_Y, 0x41 },
+   { "", 0, 0}
+};
+
+struct instruction inst_f[] = {
+   { "", 0, 0}
+};
+
+struct instruction inst_g[] = {
+   { "", 0, 0}
+};
+
+struct instruction inst_h[] = {
+   { "", 0, 0}
+};
+
+struct instruction inst_i[] = {
    { "INC", ZP|ZP_X|ABS|ABS_X, 0xe2 },
    { "INX", NONE, 0xe8 },
    { "INY", NONE, 0xc8 },
+   { "", 0, 0}
+};
+
+struct instruction inst_j[] = {
    { "JMP", ABS|ABS_IND, 0x40 },
    { "JSR", ABS, 0x14 },
+   { "", 0, 0}
+};
+
+struct instruction inst_k[] = {
+   { "", 0, 0}
+};
+
+struct instruction inst_l[] = {
    { "LDA", IMM|ZP|ZP_X|ABS|ABS_X|ABS_Y|IND_X|IND_Y, 0xa1 },
    { "LDX", IMM2|ZP|ZP_Y|ABS|ABS_Y2, 0xa2 },
    { "LDY", IMM2|ZP|ZP_X|ABS|ABS_X, 0xa0 },
    { "LSR", ACC|ZP|ZP_X|ABS|ABS_X, 0x42 },
+   { "", 0, 0}
+};
+
+struct instruction inst_m[] = {
+   { "", 0, 0}
+};
+
+struct instruction inst_n[] = {
    { "NOP", NONE, 0xea },
+   { "", 0, 0}
+};
+
+struct instruction inst_o[] = {
    { "ORA", IMM|ZP|ZP_X|ABS|ABS_X|ABS_Y|IND_X|IND_Y, 0x01 },
+   { "", 0, 0}
+};
+
+struct instruction inst_p[] = {
    { "PHA", NONE, 0x48 },
    { "PHP", NONE, 0x08 },
    { "PLA", NONE, 0x68 },
    { "PLP", NONE, 0x28 },
+   { "", 0, 0}
+};
+
+struct instruction inst_q[] = {
+   { "", 0, 0}
+};
+
+struct instruction inst_r[] = {
    { "ROL", ACC|ZP|ZP_X|ABS|ABS_X, 0x22 },
    { "ROR", ACC|ZP|ZP_X|ABS|ABS_X, 0x62 },
    { "RTI", NONE, 0x40 },
    { "RTS", NONE, 0x60 },
+   { "", 0, 0}
+};
+
+struct instruction inst_s[] = {
    { "SBC", IMM|ZP|ZP_X|ABS|ABS_X|ABS_Y|IND_X|IND_Y, 0xe1 },
    { "SEC", NONE, 0x38 },
    { "SED", NONE, 0xf8 },
@@ -194,12 +267,40 @@ struct instruction instructions[] = {
    { "STA", ZP|ZP_X|ABS|ABS_X|ABS_Y|IND_X|IND_Y, 0x81 },
    { "STX", ZP|ZP_Y|ABS, 0x82 },
    { "STY", ZP|ZP_X|ABS, 0x80 },
+   { "", 0, 0}
+};
+
+struct instruction inst_t[] = {
    { "TAX", NONE, 0xaa },
    { "TAY", NONE, 0xa8 },
    { "TSX", NONE, 0xba },
    { "TXA", NONE, 0x8a },
    { "TXS", NONE, 0x9a },
-   { "TYA", NONE, 0x98 }
+   { "TYA", NONE, 0x98 },
+   { "", 0, 0}
+};
+
+struct instruction *instructions[] = {
+   inst_a,
+   inst_b,
+   inst_c,
+   inst_d,
+   inst_e,
+   inst_f,
+   inst_g,
+   inst_h,
+   inst_i,
+   inst_j,
+   inst_k,
+   inst_l,
+   inst_m,
+   inst_n,
+   inst_o,
+   inst_p,
+   inst_q,
+   inst_r,
+   inst_s,
+   inst_t
 };
 
 static void error(const unsigned char);
@@ -214,7 +315,7 @@ static void skip_delimiter(void);
 #ifndef __CC65__
 static char *strupper(char *);
 #endif
-static int get_command(void);
+struct instruction *get_command(void);
 static int get_pseudo_func(void);
 struct symbol *find_symbol(const char *); /* used by unit tests */
 static struct symbol *find_local_symbol(const char *);
@@ -225,7 +326,7 @@ static void print_symbols(void);
 static struct symbol *get_symbol(const unsigned int);
 static void swap_symbols(struct symbol *, struct symbol *);
 static void sort_symbols(void);
-static struct token *make_token(const unsigned int, const int, const char *);
+static struct token *make_token(const unsigned int, const int, const char *, const struct instruction *);
 static void free_tokens(void);
 static char *get_string(void);
 static unsigned int get_binary_number(void);
