@@ -304,6 +304,7 @@ struct instruction *instructions[] = {
 };
 
 static void error(const unsigned char);
+static void fatal(const unsigned char);
 void init(void); /* used by unit tests */
 static void open_file(struct file *);
 static void close_file(struct file *);

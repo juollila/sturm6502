@@ -24,6 +24,7 @@ char line[MAX_LINE_LEN];
 char cline[MAX_LINE_LEN]; /* line with preversed case */
 unsigned char column, opt_debug;
 static unsigned char pass, opt_list, opt_symbol;
+unsigned char num_of_errors;
 static unsigned char if_supress, if_seen;
 unsigned int PC;
 static struct symbol *symbols, *last_symbol, *last_label;
@@ -31,20 +32,25 @@ static struct token *tokens, *last_token, *tok_global;
 static struct macro *macros, *last_macro;
 /* for unit tests */
 char unit_obj[3];
-unsigned char unit_asm_fails;
 
 static void error(const unsigned char err) {
+   num_of_errors++;
    #ifdef UNIT_TEST
-   unit_asm_fails += 1;
    printf("%s", error_msg[err]);
    #else
    printf("%s:%d %s\n", file_cur->name, file_cur->line_number, error_msg[err]);
-   exit(1);
+   if (num_of_errors >= 5)
+      exit(1);
    #endif
 }
 
+static void fatal(const unsigned char err) {
+   printf("%s:%d %s\n", file_cur->name, file_cur->line_number, error_msg[err]);
+   exit(1);
+}
+
 void init(void) {
-   unit_asm_fails = 0;
+   num_of_errors = 0;
    column = 0;
    PC = 0;
    pass = 1;
@@ -101,7 +107,7 @@ static char *read_line(struct file *file) {
    file->line_number++;
    input = fgets(line, MAX_LINE_LEN, file->file);
    if (input == NULL && ferror(file->file))
-      error(READ_ERROR);
+      fatal(READ_ERROR);
    return input;
 }
 
@@ -339,7 +345,7 @@ static struct token *make_token(const unsigned int id, const int value, const ch
       new_tok->inst = (struct instruction *)inst;
       new_tok->next = NULL;
       last_token = new_tok;
-   } else error(OUT_OF_MEMORY);
+   } else fatal(OUT_OF_MEMORY);
    return new_tok;
 }
 
@@ -691,7 +697,7 @@ static void emit0(void) {
       printf("%05d %04X          %s", file_cur->line_number, PC, &cline[0]);
    if (pass == 2 & opt_list == 1)
       if (fprintf(file_lst.file, "%05d %04X          %s", file_cur->line_number, PC, &cline[0]) < 0)
-         error(WRITE_ERROR);
+         fatal(WRITE_ERROR);
    #endif
 }
 
@@ -705,9 +711,9 @@ static void emit1(const unsigned char b1) {
       printf("%05d %04X %02X       %s", file_cur->line_number, PC, b1, &cline[0]);
    if (pass == 2 & opt_list == 1)
       if (fprintf(file_lst.file, "%05d %04X %02X       %s", file_cur->line_number, PC, b1, &cline[0]) < 0)
-         error(WRITE_ERROR);
+         fatal(WRITE_ERROR);
    if (pass == 2)
-      if (fputc(b1, file_out.file) == EOF) error(WRITE_ERROR);
+      if (fputc(b1, file_out.file) == EOF) fatal(WRITE_ERROR);
    #endif
    PC = PC + 1;
 }
@@ -722,10 +728,10 @@ static void emit2(const unsigned char b1, const unsigned char b2) {
       printf("%05d %04X %02X %02X    %s", file_cur->line_number, PC, b1, b2, &cline[0]);
    if (pass == 2 & opt_list == 1)
       if (fprintf(file_lst.file, "%05d %04X %02X %02X    %s", file_cur->line_number, PC, b1, b2, &cline[0]) < 0)
-         error(WRITE_ERROR);
+         fatal(WRITE_ERROR);
    if (pass == 2) {
-      if (fputc(b1, file_out.file) == EOF) error(WRITE_ERROR);
-      if (fputc(b2, file_out.file) == EOF) error(WRITE_ERROR);
+      if (fputc(b1, file_out.file) == EOF) fatal(WRITE_ERROR);
+      if (fputc(b2, file_out.file) == EOF) fatal(WRITE_ERROR);
    }
    #endif
    PC = PC + 2;
@@ -741,11 +747,11 @@ static void emit3(const unsigned char b1, const unsigned char b2, const unsigned
       printf("%05d %04X %02X %02X %02X %s", file_cur->line_number, PC, b1, b2, b3, &cline[0]);
    if (pass == 2 & opt_list == 1)
       if (fprintf(file_lst.file, "%05d %04X %02X %02X %02X %s", file_cur->line_number, PC, b1, b2, b3, &cline[0]) < 0)
-         error(WRITE_ERROR);
+         fatal(WRITE_ERROR);
    if (pass == 2) {
-      if (fputc(b1, file_out.file) == EOF) error(WRITE_ERROR);
-      if (fputc(b2, file_out.file) == EOF) error(WRITE_ERROR);
-      if (fputc(b3, file_out.file) == EOF) error(WRITE_ERROR);
+      if (fputc(b1, file_out.file) == EOF) fatal(WRITE_ERROR);
+      if (fputc(b2, file_out.file) == EOF) fatal(WRITE_ERROR);
+      if (fputc(b3, file_out.file) == EOF) fatal(WRITE_ERROR);
    }
    #endif
    PC = PC + 3;
@@ -781,7 +787,7 @@ static void parse_macro_params(struct macro *mac) {
          new_param->next = NULL;
          if (mac->param == NULL) mac->param = new_param; else last_param->next = new_param;
          last_param = new_param;
-      } else error(OUT_OF_MEMORY);
+      } else fatal(OUT_OF_MEMORY);
    }
 }
 
@@ -906,9 +912,9 @@ static void make_macro(const char *name) {
             new_line->str = text;
             new_line->next = NULL;
             last_line = new_line;
-         } else error(OUT_OF_MEMORY);
+         } else fatal(OUT_OF_MEMORY);
       }
-   } else error(OUT_OF_MEMORY);
+   } else fatal(OUT_OF_MEMORY);
 }
 
 static void print_macros(void) {
@@ -1197,7 +1203,7 @@ static void handle_endif(void) {
 static void handle_endmac(void) {
    /* This call should not happen */
    /* make_macro handles .mac */
-   error(INTERNAL_ERROR);
+   fatal(INTERNAL_ERROR);
 }
 
 static void handle_if(void) {
@@ -1263,7 +1269,7 @@ static void handle_incbin(void) {
          emit1(input);
       close_file(&file_bin);
       if (ferror(file_bin.file))
-         error(READ_ERROR);
+         fatal(READ_ERROR);
    } else error(INVALID_STRING);
 }
 
@@ -1297,7 +1303,7 @@ static void handle_include(void) {
 static void handle_mac(void) {
    /* This call should not happen */
    /* make_macro handles .mac */
-   error(INTERNAL_ERROR);
+   fatal(INTERNAL_ERROR);
 }
 
 static void handle_org(void) {
@@ -1321,7 +1327,7 @@ static void handle_word(void) {
 
 #ifndef __CC65__
 static void usage(void) {
-   printf("Sturm6502 v0.22 macro assembler\n");
+   printf("Sturm6502 v0.25 macro assembler\n");
    printf("Coded by Juha Ollila\n\n");
    printf("Usage:          sturm6502 [options] sourcefile\n\n");
    printf("-d #            debug level (1..3)\n");
@@ -1400,7 +1406,7 @@ int main(int argc, char *argv[]) {
    cc65_params();
 #endif
    file_cur = &file_asm;
-   for (pass = 1; pass < 3; pass++) {
+   for (pass = 1; pass < 3 && num_of_errors==0; pass++) {
       PC = 0;
       last_label = NULL;
       open_file(file_cur);
@@ -1413,8 +1419,8 @@ int main(int argc, char *argv[]) {
       }
       if (pass == 2 && opt_list == 1) {
          open_file(&file_lst);
-         if (fprintf(file_lst.file, "*** Listing ***\n") < 0) error(WRITE_ERROR);
-         if (fprintf(file_lst.file, "Line# Loc  Code     Line\n") < 0) error(WRITE_ERROR);
+         if (fprintf(file_lst.file, "*** Listing ***\n") < 0) fatal(WRITE_ERROR);
+         if (fprintf(file_lst.file, "Line# Loc  Code     Line\n") < 0) fatal(WRITE_ERROR);
       }
       while((str = read_line(file_cur)) != 0) {
          strcpy(&cline[0], &line[0]);
